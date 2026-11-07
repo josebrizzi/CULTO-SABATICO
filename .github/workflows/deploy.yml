@@ -1,0 +1,54 @@
+name: Publicar en GitHub Pages
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Bajar el código
+        uses: actions/checkout@v4
+
+      - name: Instalar Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Instalar dependencias
+        run: bun install
+
+      - name: Compilar la versión estática
+        run: |
+          REPO_NAME="${GITHUB_REPOSITORY#*/}"
+          if [[ "$REPO_NAME" == *.github.io ]]; then
+            export BASE_PATH=""
+          else
+            export BASE_PATH="/$REPO_NAME"
+          fi
+          export STATIC_EXPORT=1
+          bun run build:static
+
+      - name: Configurar Pages
+        uses: actions/configure-pages@v5
+
+      - name: Subir los archivos
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: .next-static
+
+      - name: Publicar
+        id: deployment
+        uses: actions/deploy-pages@v4
