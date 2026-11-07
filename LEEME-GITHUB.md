@@ -1,0 +1,72 @@
+# ☁️ Opción 2 — Subir a GitHub (link gratis para abrir desde cualquier lado)
+
+Con esta opción tu app queda publicada **gratis para siempre** en una dirección tipo:
+
+```
+https://TU-USUARIO.github.io/tiempos-del-culto/
+```
+
+La abrís en la compu de la iglesia, en tu celular o donde quieras, sin instalar nada. **GitHub lo arma y publica solo**: vos solo subís los archivos.
+
+> ⚠️ Requisito: el repo tiene que ser **Public** (así es gratis en GitHub Pages). La app no tiene claves ni datos privados, así que no hay problema.
+>
+> 🍎 **Si estás en Mac:** la carpeta `.github` está oculta en el Finder. Apretá `Cmd + Shift + .` para verla antes de arrastrar todo.
+
+## Paso a paso (sin saber de código, ~10 minutos)
+
+### 1. Crear la cuenta
+Entrá a **https://github.com** → *Sign up* → creá tu cuenta gratis.
+
+### 2. Crear el repositorio
+1. Ya dentro, tocá el botón **`+`** (arriba a la derecha) → **New repository**.
+2. Poné un nombre, por ejemplo: `tiempos-del-culto`
+3. Dejalo marcado como **Public**.
+4. Tocá **Create repository**.
+
+### 3. Subir los archivos
+1. En la página del repo nuevo, buscá el enlace **"uploading an existing file"** (o el botón *Uploads*).
+2. Abrí **esta carpeta** (`2-para-subir-a-GitHub`) en tu compu y **arrastrá TODO su contenido** a esa página:
+   - las carpetas `src`, `public` y `.github`
+   - todos los archivos sueltos (`package.json`, `bun.lock`, `next.config.ts`, etc.)
+3. Esperá que termine la subida y tocá **Commit changes**.
+
+### 4. Activar la publicación
+1. En el repo, andá a **Settings** (arriba) → menú izquierdo **Pages**.
+2. En **"Build and deployment"** → **Source** → elegí **GitHub Actions**.
+
+### 5. Esperar 2–3 minutos
+1. Andá a la pestaña **Actions** del repo.
+2. Vas a ver el trabajo **"Publicar en GitHub Pages"** corriendo 🟡 → esperá que quede **verde** ✅.
+3. Listo: tu app está en
+   **`https://TU-USUARIO.github.io/tiempos-del-culto/`**
+   (el enlace exacto también aparece en **Settings → Pages**, arriba).
+
+## Uso en el culto
+
+1. En la compu conectada al proyector, abrí ese enlace en el navegador.
+2. Tocá **"Abrir pantalla del orador"**, arrastrá la ventana nueva al proyector, **F11**.
+3. ¿Alguien tiene que **leer un texto**? En el panel, sección **Teleprompter**:
+   pegás el texto, tocás **"Enviar al teleprompter"** y **"Abrir pantalla"**.
+   El texto sale gigante y el avance del scroll lo manejás vos desde el panel
+   (botones **↑ ↓** o deslizador). Esa pantalla se abre con `#teleprompter`
+   al final del enlace.
+4. 💡 Guardá el enlace en **favoritos** o creale un **acceso directo en el escritorio** para abrirlo con doble clic.
+
+> 💡 **El anunciador y el predicador no tocan nada:** las tarjetas de anuncios
+> se escriben, editan y pasan **directo en la vista “Ahora”** del panel (con
+> **← →** o tocando el numerito; las ya mostradas quedan tachadas ahí) y los
+> mensajes se sacan desde el panel. Todo es una sola vía: del panel hacia las
+> pantallas.
+
+## Para actualizar la app más adelante
+
+Volvé a hacer el paso 3 (subir archivos): arrastrá los archivos cambiados, **Commit changes**, y GitHub lo republica solo en un par de minutos.
+
+## ¿Problemas?
+
+| Síntoma | Solución |
+|---|---|
+| En Actions sale rojo ❌ | Entrá al trabajo, fijate qué paso falló y volvé a subir los archivos completos. Lo más común: faltó arrastrar la carpeta `.github` o algún archivo suelto. |
+| La página da 404 | Revisá el paso 4: **Source → GitHub Actions**. Después tocá **Re-run** en Actions. |
+| Sale "blank page" | Confirmaste que el repo es **Public** y esperaste el deploy verde antes de abrir. |
+| ¿Puedo usarlo con internet inestable? | Para esos casos te conviene la **Opción 1** (instalada en la PC, no necesita internet). |
