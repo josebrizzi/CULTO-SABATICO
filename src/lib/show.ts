@@ -150,31 +150,53 @@ function seg(
 
 export function defaultSegments(): Segment[] {
   return [
-    seg("Bienvenida", 5, "timer", "emerald", "Anunciador", [
-      "Saludo a la congregación",
-      "Bienvenida especial a las visitas",
-      "Invitación a ponerse de pie para la alabanza",
-    ], ""),
-    seg("Alabanza", 20, "timer", "violet", "Ministerio de alabanza", [], ""),
-    seg("Anuncios", 10, "script", "amber", "Anunciador", [
+    seg("Escuela Sabática", 45, "script", "emerald", "Superintendente", [
+      "Inicio",
+      "Oración",
+      "Misionero",
+      "Oración del maestro",
+      "Desarrollo de la clase",
+      "Minutos misioneros",
+      "Oración",
+      "Cierre",
+    ], "", true),
+    seg("Avisos", 10, "script", "amber", "Anunciador", [
+      "Culto de oración: martes 20:00",
+      "Sociedad de jóvenes: martes 18:00 (puede cambiar en invierno/verano)",
       "Bienvenida a las visitas: quedate después del culto para conocernos",
-      "Reunión de oración: miércoles 19:30",
-      "Culto de jóvenes: viernes 20:00",
       "Recordar la ofrenda del día",
-    ], "No olvidar: mencionar el salón de niños y quién se encarga este sábado.\nCerrar pasando a la ofrenda.", true),
-    seg("Ofrenda", 10, "script", "orange", "Anunciador", [
+    ], "No olvidar: mencionar el salón de niños y quién se encarga este sábado.\nCerrar pasando a la liturgia.", true),
+    seg("Liturgia: Alabanza", 15, "timer", "violet", "Ministerio de alabanza", [], ""),
+    seg("Liturgia: Ofrenda", 10, "script", "orange", "", [
       "Pasaje bíblico breve",
       "Oración por la ofrenda",
       "Recibir las ofrendas mientras se alaba",
     ], ""),
-    seg("Predicación", 35, "timer", "rose", "Predicador", [
+    seg("Liturgia: Mensaje", 35, "timer", "rose", "Predicador", [
       "Título del mensaje",
       "Punto 1",
       "Punto 2",
       "Aplicación y llamado final",
     ], ""),
-    seg("Oración final", 5, "timer", "teal", "Pastor", [], ""),
+    seg("Liturgia: Oración final", 5, "timer", "teal", "Pastor", [], ""),
   ];
+}
+
+/** Títulos y minutos de la plantilla vieja (para poder actualizarla sola). */
+const OLD_TEMPLATE_SHAPE: [string, number][] = [
+  ["Bienvenida", 5],
+  ["Alabanza", 20],
+  ["Anuncios", 10],
+  ["Ofrenda", 10],
+  ["Predicación", 35],
+  ["Oración final", 5],
+];
+
+function isOldTemplate(segs: Segment[]): boolean {
+  return (
+    segs.length === OLD_TEMPLATE_SHAPE.length &&
+    segs.every((s, i) => s.title === OLD_TEMPLATE_SHAPE[i][0] && s.minutes === OLD_TEMPLATE_SHAPE[i][1])
+  );
 }
 
 export function defaultState(): ShowState {
@@ -281,11 +303,14 @@ function normalize(raw: unknown): ShowState | null {
     // Migración: los momentos llamados "Anuncios" pasan a tarjetas automáticamente
     cards: asBool(x.cards, /anunci/i.test(asStr(x.title, ""))),
   }));
+  // Migración de plantilla: si el programa guardado sigue siendo el ejemplo viejo
+  // (sin personalizar), traer el programa sabático nuevo.
+  const finalSegments = isOldTemplate(segments) ? defaultSegments() : segments;
   const status = asStr(r.status, "idle");
   return {
     rev: asNum(r.rev, 1),
     serviceTitle,
-    segments,
+    segments: finalSegments,
     currentIndex: Math.trunc(asNum(r.currentIndex, -1)),
     status: (["idle", "running", "paused", "finished"] as const).includes(
       status as ShowStatus,

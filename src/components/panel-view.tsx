@@ -70,6 +70,7 @@ import {
   cardsActive,
   currentSegment,
   currentSlide,
+  defaultSegments,
   elapsedCurrent,
   fmtHMS,
   fmtMin,
@@ -742,10 +743,32 @@ export default function PanelView() {
         {/* Programa */}
         <Card className="order-2 lg:order-1">
           <CardHeader className="pb-3">
-            <CardTitle className="text-base">Programa del culto</CardTitle>
-            <CardDescription>
-              {state.segments.length} momentos · {fmtMin(totalMin)} en total
-            </CardDescription>
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-base">Programa del culto</CardTitle>
+                <CardDescription>
+                  {state.segments.length} momentos · {fmtMin(totalMin)} en total
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 shrink-0 text-muted-foreground"
+                title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
+                aria-label="Cargar plantilla sabática"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
+                    )
+                  ) {
+                    mutate((p) => ({ ...p, segments: defaultSegments(), slideIndex: 0 }));
+                  }
+                }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
+              </Button>
+            </div>
           </CardHeader>
           <CardContent className="space-y-1.5">
             <div className="max-h-[62vh] space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
