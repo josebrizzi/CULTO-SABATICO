@@ -14,10 +14,10 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Tiempos del Culto — Contador y teleprompter para la iglesia",
+  title: "Tiempos del Culto — Contador y pantallas para la iglesia",
   description:
-    "Control de tiempos del culto: contador en pantalla para predicación, alabanza y anuncios, guion tipo teleprompter para el orador y mensajes del operador.",
-  keywords: ["iglesia", "culto", "contador", "teleprompter", "stage timer", "predicación", "anuncios"],
+    "Control de tiempos del culto: tarjeta editable por momento, contador en pantalla para la congregación y pantalla del predicador con el tiempo grande.",
+  keywords: ["iglesia", "culto", "contador", "stage timer", "predicación", "anuncios", "sábado"],
   authors: [{ name: "Tiempos del Culto" }],
   icons: {
     icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",

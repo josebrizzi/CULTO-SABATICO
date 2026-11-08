@@ -44,19 +44,15 @@ Entrá a **https://github.com** → *Sign up* → creá tu cuenta gratis.
 ## Uso en el culto
 
 1. En la compu conectada al proyector, abrí ese enlace en el navegador.
-2. Tocá **"Abrir pantalla del orador"**, arrastrá la ventana nueva al proyector, **F11**.
-3. ¿Alguien tiene que **leer un texto**? En el panel, sección **Teleprompter**:
-   pegás el texto, tocás **"Enviar al teleprompter"** y **"Abrir pantalla"**.
-   El texto sale gigante y el avance del scroll lo manejás vos desde el panel
-   (botones **↑ ↓** o deslizador). Esa pantalla se abre con `#teleprompter`
-   al final del enlace.
+2. Tocá **"Abrir pantalla de proyección"** y **"Abrir pantalla del predicador"**; arrastrá cada ventana a su pantalla (**Win + Shift + →**) y **F11** en cada una.
+3. Manejá el culto desde el panel: la **secuencia horizontal** de arriba (tocás un momento y salta a él), el botón **Iniciar / Pausar / Siguiente**, la **tarjeta de avisos** en “Ahora” y los **mensajes** al orador.
 4. 💡 Guardá el enlace en **favoritos** o creale un **acceso directo en el escritorio** para abrirlo con doble clic.
 
-> 💡 **El anunciador y el predicador no tocan nada:** las tarjetas de anuncios
-> se escriben, editan y pasan **directo en la vista “Ahora”** del panel (con
-> **← →** o tocando el numerito; las ya mostradas quedan tachadas ahí) y los
-> mensajes se sacan desde el panel. Todo es una sola vía: del panel hacia las
-> pantallas.
+> 💡 **El anunciador y el predicador no tocan nada:** la tarjeta de avisos se
+> escribe y se edita en vivo desde la vista “Ahora” del panel, y los mensajes se
+> sacan desde el panel. Todo es una sola vía: del panel hacia las pantallas.
+> La pantalla del predicador solo muestra la **pastilla grande** del momento y
+> el **tiempo grande debajo**, sin mensajes.
 
 ## Para actualizar la app más adelante
 

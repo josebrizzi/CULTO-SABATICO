@@ -9,7 +9,6 @@ import {
   COLORS,
   cardsActive,
   currentSegment,
-  currentSlide,
   elapsedCurrent,
   fmtHMS,
   fmtMin,
@@ -43,7 +42,6 @@ export default function StageView() {
   const mode = seg?.layout ?? "timer";
   const live = now > 0 && active;
   const cardsOn = active && cardsActive(seg);
-  const slide = cardsOn ? currentSlide(state) : null;
 
   const counterText = live
     ? phase === "overtime"
@@ -137,14 +135,15 @@ export default function StageView() {
     window.location.hash = "#panel";
   };
 
-  /* Tarjeta grande: el tamaño de letra se adapta al largo del texto */
-  function cardFontSize(text: string): string {
+  /* Tarjeta grande (una sola, con todos los puntos): el tamaño de letra se
+     adapta al largo del texto y a la cantidad de renglones */
+  function cardFontSize(text: string, lines: number): string {
     const len = text.length;
-    if (len <= 40) return "min(9vw, 15vh)";
-    if (len <= 90) return "min(7.5vw, 12vh)";
-    if (len <= 160) return "min(6vw, 9.5vh)";
-    if (len <= 260) return "min(5vw, 7.5vh)";
-    return "min(4vw, 6vh)";
+    const capLenW = len <= 40 ? "9vw" : len <= 90 ? "7.5vw" : len <= 160 ? "6vw" : len <= 260 ? "5vw" : "4vw";
+    const capLenH = len <= 40 ? "15vh" : len <= 90 ? "12vh" : len <= 160 ? "9.5vh" : len <= 260 ? "7.5vh" : "6vh";
+    const capLinesW = lines <= 1 ? "9vw" : lines <= 3 ? "6.5vw" : lines <= 5 ? "5vw" : lines <= 7 ? "4vw" : "3.2vw";
+    const capLinesH = lines <= 1 ? "15vh" : lines <= 3 ? "9.5vh" : lines <= 5 ? "7vh" : lines <= 7 ? "5.6vh" : "4.6vh";
+    return `min(${capLenW}, ${capLenH}, ${capLinesW}, ${capLinesH})`;
   }
 
   const first = state.segments[0];
@@ -230,8 +229,8 @@ export default function StageView() {
         </div>
       ) : null}
 
-      {/* ── Momento con tarjetas grandes (anuncios): una por vez ── */}
-      {active && cardsOn && seg && slide ? (
+      {/* ── Momento con su tarjeta grande: UNA sola, con todos los puntos ── */}
+      {active && cardsOn && seg ? (
         <div className="absolute inset-0 flex flex-col">
           {/* Encabezado */}
           <div className="flex items-center justify-between gap-4 px-[4vw] pt-[6.5vh]">
@@ -250,41 +249,24 @@ export default function StageView() {
               ) : null}
             </div>
             <div className="shrink-0 text-[2.2vh] font-bold tabular-nums text-zinc-400">
-              {slide.index + 1} / {slide.total}
+              {seg.bullets.length} {seg.bullets.length === 1 ? "punto" : "puntos"}
             </div>
           </div>
 
-          {/* Tarjeta actual: texto gigante */}
+          {/* Tarjeta: todos los puntos juntos, con letra gigante */}
           <div className="flex min-h-0 flex-1 items-center justify-center px-[5vw]">
             <div
-              key={`${seg.id}-${slide.index}`}
-              className="animate-card-in max-w-[88vw] text-center font-bold leading-tight text-balance text-white"
-              style={{ fontSize: cardFontSize(slide.text) }}
+              key={seg.id}
+              className="animate-card-in max-w-[90vw] text-center font-bold leading-[1.3] text-balance text-white"
+              style={{ fontSize: cardFontSize(seg.bullets.join(" "), seg.bullets.length) }}
             >
-              {slide.text}
-            </div>
-          </div>
-
-          {/* Puntos de progreso */}
-          {slide.total > 1 ? (
-            <div className="flex items-center justify-center gap-[1.1vw] pb-[2.5vh]">
-              {seg.bullets.map((_, i) => (
-                <span
-                  key={i}
-                  className={cn(
-                    "h-[1.5vh] rounded-full transition-all",
-                    i === slide.index
-                      ? "w-[4.5vw] bg-white"
-                      : i < slide.index
-                        ? "w-[1.5vh] bg-zinc-400"
-                        : "w-[1.5vh] bg-zinc-700",
-                  )}
-                />
+              {seg.bullets.map((b, i) => (
+                <div key={i} className="py-[0.9vh]">
+                  {b}
+                </div>
               ))}
             </div>
-          ) : (
-            <div className="pb-[2.5vh]" />
-          )}
+          </div>
 
           {/* Contador abajo */}
           <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-[4vw] py-[1.8vh]">
@@ -388,7 +370,7 @@ export default function StageView() {
         </div>
       ) : null}
 
-      {/* ── Momento en modo guion (teleprompter) + contador abajo ── */}
+      {/* ── Momento en modo guion + contador abajo ── */}
       {active && !cardsOn && mode === "script" && seg ? (
         <div className="absolute inset-0 flex flex-col">
           <div className="px-[4vw] pt-[6.5vh]">

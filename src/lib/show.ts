@@ -25,18 +25,6 @@ export interface StageMessage {
   urgent: boolean;
 }
 
-/** Pantalla exclusiva de teleprompter, manejada 100 % desde el panel */
-export interface PrompterState {
-  /** Texto que se está leyendo */
-  text: string;
-  /** Posición de scroll de 0 (inicio) a 1 (final) */
-  offset: number;
-  /** Escala del tamaño de letra (1 = normal) */
-  fontScale: number;
-  /** Cuánto avanza por pulsación manual, en % de la pantalla */
-  stepPct: number;
-}
-
 export interface Settings {
   /** Minutos restantes en los que el contador se pone amarillo (0 = sin aviso) */
   warningMin: number;
@@ -59,11 +47,8 @@ export interface ShowState {
   startedAt: number | null;
   /** ms acumulados antes de la última pausa */
   elapsedBefore: number;
-  /** Índice de la tarjeta visible del momento actual (0 = primera) */
-  slideIndex: number;
   message: StageMessage | null;
   settings: Settings;
-  prompter: PrompterState;
   updatedAt: number;
 }
 
@@ -208,19 +193,12 @@ export function defaultState(): ShowState {
     status: "idle",
     startedAt: null,
     elapsedBefore: 0,
-    slideIndex: 0,
     message: null,
     settings: {
       warningMin: 3,
       blink: true,
       autoAdvance: true,
       showBulletsOnTimer: true,
-    },
-    prompter: {
-      text: "",
-      offset: 0,
-      fontScale: 1,
-      stepPct: 25,
     },
     updatedAt: Date.now(),
   };
@@ -263,19 +241,12 @@ function normalize(raw: unknown): ShowState | null {
     status?: unknown;
     startedAt?: unknown;
     elapsedBefore?: unknown;
-    slideIndex?: unknown;
     message?: { id?: unknown; text?: unknown; urgent?: unknown } | null;
     settings?: {
       warningMin?: unknown;
       blink?: unknown;
       autoAdvance?: unknown;
       showBulletsOnTimer?: unknown;
-    } | null;
-    prompter?: {
-      text?: unknown;
-      offset?: unknown;
-      fontScale?: unknown;
-      stepPct?: unknown;
     } | null;
     updatedAt?: unknown;
   };
@@ -319,7 +290,6 @@ function normalize(raw: unknown): ShowState | null {
       : "idle",
     startedAt: typeof r.startedAt === "number" ? r.startedAt : null,
     elapsedBefore: asNum(r.elapsedBefore, 0),
-    slideIndex: clamp(Math.trunc(asNum(r.slideIndex, 0)), 0, 9999),
     message:
       r.message && typeof r.message.text === "string"
         ? {
@@ -333,12 +303,6 @@ function normalize(raw: unknown): ShowState | null {
       blink: asBool(r.settings?.blink, true),
       autoAdvance: asBool(r.settings?.autoAdvance, true),
       showBulletsOnTimer: asBool(r.settings?.showBulletsOnTimer, true),
-    },
-    prompter: {
-      text: asStr(r.prompter?.text, ""),
-      offset: clamp(asNum(r.prompter?.offset, 0), 0, 1),
-      fontScale: clamp(asNum(r.prompter?.fontScale, 1), 0.5, 3),
-      stepPct: clamp(asNum(r.prompter?.stepPct, 25), 5, 90),
     },
     updatedAt: asNum(r.updatedAt, Date.now()),
   };
@@ -533,62 +497,11 @@ export function currentSegment(s: ShowState): Segment | null {
   return s.segments[s.currentIndex];
 }
 
-/* ─────────────────── Tarjetas (anuncios) ───────────────────── */
+/* ─────────────── Tarjeta grande del momento (una sola) ─────────────── */
 
-/** El momento actual muestra tarjetas grandes (una por vez)? */
+/** El momento actual muestra su tarjeta grande con todos los puntos? */
 export function cardsActive(seg: Segment | null | undefined): boolean {
   return !!seg && seg.cards && seg.bullets.length > 0;
-}
-
-/** Tarjeta visible del momento actual, con el índice ajustado a la cantidad real. */
-export function currentSlide(s: ShowState): {
-  index: number;
-  total: number;
-  text: string;
-} {
-  const seg = currentSegment(s);
-  const total = seg?.bullets.length ?? 0;
-  const index = total > 0 ? clamp(Math.trunc(s.slideIndex || 0), 0, total - 1) : 0;
-  return { index, total, text: total > 0 ? (seg?.bullets[index] ?? "") : "" };
-}
-
-export function goSlide(s: ShowState, idx: number): ShowState {
-  const seg = currentSegment(s);
-  if (!seg || seg.bullets.length === 0) return { ...s, slideIndex: 0 };
-  return { ...s, slideIndex: clamp(Math.trunc(idx), 0, seg.bullets.length - 1) };
-}
-
-export function stepSlide(s: ShowState, delta: number): ShowState {
-  return goSlide(s, (s.slideIndex || 0) + delta);
-}
-
-/* ───────────────────── Teleprompter exclusivo ─────────────────── */
-
-/** Carga un texto en el teleprompter y vuelve al inicio. */
-export function prompterSend(s: ShowState, text: string): ShowState {
-  return {
-    ...s,
-    prompter: { ...s.prompter, text, offset: 0 },
-  };
-}
-
-/** Salto manual: delta en fracción de pantalla (p. ej. 0.25 = un cuarto). */
-export function prompterStep(s: ShowState, delta: number): ShowState {
-  return {
-    ...s,
-    prompter: {
-      ...s.prompter,
-      offset: clamp(s.prompter.offset + delta, 0, 1),
-    },
-  };
-}
-
-/** Va a una posición exacta del scroll (0..1). */
-export function prompterGo(s: ShowState, offset: number): ShowState {
-  return {
-    ...s,
-    prompter: { ...s.prompter, offset: clamp(offset, 0, 1) },
-  };
 }
 
 export function nextSegment(s: ShowState): Segment | null {
@@ -659,7 +572,6 @@ export function start(s: ShowState, now: number): ShowState {
       status: "running",
       startedAt: now,
       elapsedBefore: 0,
-      slideIndex: 0,
     };
   }
   return { ...s, status: "running", startedAt: now };
@@ -692,7 +604,6 @@ export function advance(s: ShowState, now: number): ShowState {
     status: auto ? "running" : "paused",
     startedAt: auto ? now : null,
     elapsedBefore: 0,
-    slideIndex: 0,
   };
 }
 
@@ -704,7 +615,6 @@ export function back(s: ShowState): ShowState {
     status: idx < 0 ? "idle" : "paused",
     startedAt: null,
     elapsedBefore: 0,
-    slideIndex: 0,
   };
 }
 
@@ -716,7 +626,6 @@ export function jumpTo(s: ShowState, idx: number): ShowState {
     status: "paused",
     startedAt: null,
     elapsedBefore: 0,
-    slideIndex: 0,
   };
 }
 
@@ -727,7 +636,6 @@ export function resetService(s: ShowState): ShowState {
     status: "idle",
     startedAt: null,
     elapsedBefore: 0,
-    slideIndex: 0,
     message: null,
   };
 }

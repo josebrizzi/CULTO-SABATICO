@@ -3,12 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   Check,
   ChevronDown,
-  ChevronLeft,
-  ChevronRight,
   ChevronUp,
   Clock,
   ExternalLink,
@@ -16,12 +12,12 @@ import {
   MessageSquare,
   Minus,
   MonitorPlay,
+  MonitorSpeaker,
   Pencil,
   Pause,
   Play,
   Plus,
   RotateCcw,
-  ScrollText,
   Send,
   SkipBack,
   SkipForward,
@@ -57,7 +53,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -67,28 +62,21 @@ import {
   COLORS,
   COLOR_KEYS,
   ColorKey,
-  cardsActive,
   currentSegment,
-  currentSlide,
   defaultSegments,
   elapsedCurrent,
   fmtHMS,
   fmtMin,
-  goSlide,
   jumpTo,
   nextSegment,
   pause,
   phaseOf,
-  prompterGo,
-  prompterSend,
-  prompterStep,
   remainingCurrent,
   resetCurrent,
   resetService,
   Segment,
   Settings,
   start,
-  stepSlide,
   uid,
   useNow,
   useShowChannel,
@@ -112,6 +100,16 @@ export default function PanelView() {
     stateRef.current = state;
   }, [state]);
 
+  /* Auto-scroll de la secuencia horizontal: centra el momento en curso */
+  const currentChipRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    currentChipRef.current?.scrollIntoView({
+      behavior: "smooth",
+      inline: "center",
+      block: "nearest",
+    });
+  }, [state.currentIndex]);
+
   const seg = currentSegment(state);
   const next = nextSegment(state);
   const active = state.currentIndex >= 0 && seg !== null;
@@ -121,8 +119,6 @@ export default function PanelView() {
   const overtimeMs = active ? Math.max(0, elapsed - totalMs) : 0;
   const phase = active ? phaseOf(remaining, state.settings.warningMin) : "idle";
   const live = now > 0 && active;
-  const cardsOn = active && cardsActive(seg);
-  const slide = cardsOn ? currentSlide(state) : null;
 
   /* ───────────────────────── Acciones ───────────────────────── */
 
@@ -227,58 +223,17 @@ export default function PanelView() {
     mutate((p) => ({ ...p, settings: { ...p.settings, ...patch } }));
   };
 
-  const goCard = (i: number) => mutate((p) => goSlide(p, i));
-  const stepCard = (delta: number) => mutate((p) => stepSlide(p, delta));
-
   const sendMessage = (text: string, urgent: boolean) => {
     const t = text.trim();
     if (!t) return;
     mutate((p) => ({ ...p, message: { id: uid(), text: t, urgent } }));
   };
 
-  /* ────────────────────────── Teleprompter ───────────────────────── */
+  /* ────────────── Pantalla del predicador ────────────── */
 
-  const [prompterDraft, setPrompterDraft] = useState("");
-  const [lastScreenText, setLastScreenText] = useState("");
-  const prompterTextOnScreen = state.prompter.text;
-  // Si recién se abre el panel y ya había texto en pantalla, mostrarlo acá
-  if (prompterTextOnScreen !== lastScreenText) {
-    setLastScreenText(prompterTextOnScreen);
-    setPrompterDraft((d) => (d.trim() ? d : prompterTextOnScreen));
-  }
-
-  const prompterDirty =
-    prompterDraft.trim() !== "" && prompterDraft.trim() !== prompterTextOnScreen.trim();
-
-  const sendPrompter = () => {
-    const t = prompterDraft.trim();
-    if (!t) return;
-    mutate((p) => prompterSend(p, t));
-  };
-
-  const clearPrompter = () => {
-    setPrompterDraft("");
-    mutate((p) => prompterSend(p, ""));
-  };
-
-  /** Un paso manual: avanza/retrocede el % de pantalla configurado */
-  const stepPrompter = (dir: 1 | -1) =>
-    mutate((p) => prompterStep(p, (dir * p.prompter.stepPct) / 100));
-
-  const prompterTop = () => mutate((p) => prompterGo(p, 0));
-
-  const nudgeFont = (delta: number) =>
-    mutate((p) => ({
-      ...p,
-      prompter: {
-        ...p.prompter,
-        fontScale: Math.min(3, Math.max(0.5, p.prompter.fontScale + delta)),
-      },
-    }));
-
-  const openPrompterWindow = () => {
+  const openPreacherWindow = () => {
     const base = window.location.href.split("#")[0];
-    window.open(`${base}#teleprompter`, "culto-teleprompter", "width=1040,height=680");
+    window.open(`${base}#predicador`, "culto-predicador", "width=1040,height=680");
   };
 
   /* ───────────────────── Atajos de teclado ──────────────────── */
@@ -306,22 +261,6 @@ export default function PanelView() {
         }
       } else if (e.code === "KeyR") {
         if (s.currentIndex >= 0) mutate((p) => resetCurrent(p, Date.now()));
-      } else if (e.code === "ArrowRight") {
-        if (cardsActive(currentSegment(s))) {
-          e.preventDefault();
-          mutate((p) => stepSlide(p, 1));
-        }
-      } else if (e.code === "ArrowLeft") {
-        if (cardsActive(currentSegment(s))) {
-          e.preventDefault();
-          mutate((p) => stepSlide(p, -1));
-        }
-      } else if (e.code === "ArrowUp") {
-        e.preventDefault();
-        mutate((p) => prompterStep(p, -p.prompter.stepPct / 100));
-      } else if (e.code === "ArrowDown") {
-        e.preventDefault();
-        mutate((p) => prompterStep(p, p.prompter.stepPct / 100));
       }
     };
     window.addEventListener("keydown", onKey);
@@ -358,6 +297,8 @@ export default function PanelView() {
         .slice(0, 4),
     [state.segments, state.currentIndex],
   );
+
+  const editingSeg = state.segments.find((x) => x.id === editingId) ?? null;
 
   const counterColor =
     phase === "overtime"
@@ -441,24 +382,193 @@ export default function PanelView() {
                   peerOnline ? "animate-pulse bg-emerald-500" : "bg-zinc-400",
                 )}
               />
-              {peerOnline ? "Pantalla del orador conectada" : "Pantalla del orador sin abrir"}
+              {peerOnline ? "Pantalla conectada" : "Sin pantallas abiertas"}
             </Badge>
             <Button variant="outline" size="sm" onClick={() => switchView("stage")}>
               <MonitorPlay className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">Ver pantalla</span>
             </Button>
-            <Button size="sm" onClick={openStageWindow}>
+            <Button variant="outline" size="sm" onClick={openStageWindow}>
               <ExternalLink className="h-4 w-4" aria-hidden="true" />
-              <span className="hidden sm:inline">Abrir pantalla del orador</span>
+              <span className="hidden sm:inline">Abrir pantalla de proyección</span>
+            </Button>
+            <Button size="sm" onClick={openPreacherWindow}>
+              <MonitorSpeaker className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Abrir pantalla del predicador</span>
             </Button>
             <HelpDialog />
           </div>
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-[1600px] gap-4 px-3 py-4 lg:grid-cols-[minmax(300px,380px)_minmax(0,1fr)_minmax(300px,370px)]">
+      <main className="mx-auto max-w-[1600px] space-y-4 px-3 py-4">
+        {/* ── Secuencia del culto: horizontal ── */}
+        <Card>
+          <CardHeader className="pb-3">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <CardTitle className="text-base">Secuencia del culto</CardTitle>
+                <CardDescription>
+                  {state.segments.length} momentos · {fmtMin(totalMin)} en total · tocá
+                  un momento para saltar a él
+                </CardDescription>
+              </div>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-8 shrink-0 text-muted-foreground"
+                title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
+                aria-label="Cargar plantilla sabática"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
+                    )
+                  ) {
+                    mutate((p) => ({ ...p, segments: defaultSegments() }));
+                  }
+                }}
+              >
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
+              </Button>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="scrollbar-thin flex gap-2 overflow-x-auto pb-1.5">
+              {state.segments.map((x, i) => {
+                const isCurrent =
+                  i === state.currentIndex && state.status !== "finished";
+                const isDone = state.currentIndex >= 0 && i < state.currentIndex;
+                const sub = [
+                  x.speaker,
+                  x.cards && x.bullets.length > 0
+                    ? "tarjeta"
+                    : x.layout === "script"
+                      ? "guion"
+                      : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ");
+                return (
+                  <div
+                    key={x.id}
+                    ref={isCurrent ? currentChipRef : undefined}
+                    onClick={() => {
+                      if (i !== state.currentIndex) mutate((p) => jumpTo(p, i));
+                    }}
+                    className={cn(
+                      "flex w-[172px] shrink-0 cursor-pointer select-none flex-col gap-1.5 rounded-xl border p-2.5 transition-colors",
+                      isCurrent
+                        ? "border-foreground/30 bg-muted/70 ring-2 ring-foreground/15"
+                        : "bg-card hover:border-muted-foreground/30",
+                    )}
+                  >
+                    <div className="flex items-center gap-1.5">
+                      {isDone ? (
+                        <Check
+                          className="h-4 w-4 shrink-0 text-emerald-600"
+                          aria-hidden="true"
+                        />
+                      ) : isCurrent ? (
+                        <Play className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      ) : (
+                        <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">
+                          {i + 1}
+                        </span>
+                      )}
+                      <span
+                        className={cn(
+                          "h-2.5 w-2.5 shrink-0 rounded-full",
+                          COLORS[x.color].dot,
+                        )}
+                        aria-hidden="true"
+                      />
+                      <span className="ml-auto shrink-0 text-[11px] font-medium text-muted-foreground">
+                        {x.minutes} min
+                      </span>
+                    </div>
+                    <div
+                      className={cn(
+                        "truncate text-sm font-semibold leading-tight",
+                        isDone && "line-through opacity-50",
+                      )}
+                    >
+                      {x.title}
+                    </div>
+                    <div className="truncate text-[11px] text-muted-foreground">
+                      {sub || "\u00A0"}
+                    </div>
+                    {isCurrent ? (
+                      <Progress
+                        value={
+                          totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0
+                        }
+                        className={cn(
+                          "h-1",
+                          phase === "overtime"
+                            ? "[&>div]:bg-red-600"
+                            : phase === "warning"
+                              ? "[&>div]:bg-amber-500"
+                              : "[&>div]:bg-zinc-900",
+                        )}
+                      />
+                    ) : (
+                      <div className="h-1" />
+                    )}
+                    <div
+                      className="flex items-center gap-0.5"
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-7 w-7"
+                        aria-label={`Editar ${x.title}`}
+                        title="Editar"
+                        onClick={() => setEditingId(x.id)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                      </Button>
+                      <button
+                        type="button"
+                        aria-label={`Subir ${x.title}`}
+                        title="Subir"
+                        disabled={i === 0}
+                        onClick={() => moveSegment(i, -1)}
+                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Bajar ${x.title}`}
+                        title="Bajar"
+                        disabled={i === state.segments.length - 1}
+                        onClick={() => moveSegment(i, 1)}
+                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:text-foreground disabled:opacity-30"
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+              <button
+                type="button"
+                onClick={addSegment}
+                aria-label="Agregar momento"
+                className="flex w-[172px] shrink-0 cursor-pointer flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-dashed border-muted-foreground/40 p-2.5 text-muted-foreground transition-colors hover:border-foreground/30 hover:text-foreground"
+              >
+                <Plus className="h-5 w-5" aria-hidden="true" />
+                <span className="text-sm font-medium">Agregar momento</span>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(300px,370px)]">
         {/* Columna central (arriba en móvil) */}
-        <div className="order-1 space-y-4 lg:order-2">
+        <div className="space-y-4">
           <Card className="border-2">
             <CardHeader className="pb-4">
               <div className="flex items-center justify-between gap-2">
@@ -576,73 +686,28 @@ export default function PanelView() {
                     </Button>
                   </div>
 
-                  {seg && cardsOn && slide ? (
+                  {seg && seg.cards ? (
                     <div className="space-y-2.5 rounded-xl border-2 border-dashed border-amber-400/60 bg-amber-400/5 p-3">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-xs font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                          Tarjetas en pantalla · {slide.index + 1} de {slide.total}
+                          Tarjeta en pantalla · editable
                         </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex gap-1">
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="h-9 w-9"
-                              aria-label="Tarjeta anterior"
-                              disabled={slide.index <= 0}
-                              onClick={() => stepCard(-1)}
-                            >
-                              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                            <Button
-                              size="icon"
-                              variant="outline"
-                              className="h-9 w-9"
-                              aria-label="Tarjeta siguiente"
-                              disabled={slide.index >= slide.total - 1}
-                              onClick={() => stepCard(1)}
-                            >
-                              <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                            </Button>
-                          </div>
-                          <Switch
-                            checked={!!seg.cards}
-                            onCheckedChange={(v) => updateSegment(seg.id, { cards: v })}
-                            aria-label="Desactivar tarjetas grandes en este momento"
-                          />
-                        </div>
+                        <Switch
+                          checked={!!seg.cards}
+                          onCheckedChange={(v) => updateSegment(seg.id, { cards: v })}
+                          aria-label="Desactivar la tarjeta grande en este momento"
+                        />
                       </div>
 
                       <div className="space-y-1.5">
                         {seg.bullets.map((b, i) => (
                           <div key={i} className="flex items-start gap-1.5">
-                            <button
-                              type="button"
-                              aria-label={`Mostrar tarjeta ${i + 1}`}
-                              title={`Mostrar tarjeta ${i + 1}`}
-                              onClick={() => goCard(i)}
-                              className={cn(
-                                "mt-1 h-9 shrink-0 rounded-md border px-2.5 text-xs font-semibold transition-colors",
-                                i === slide.index
-                                  ? "border-foreground bg-foreground text-background"
-                                  : i < slide.index
-                                    ? "border-emerald-300 bg-emerald-100 text-emerald-800 line-through opacity-70 dark:border-emerald-700 dark:bg-emerald-900 dark:text-emerald-200"
-                                    : "bg-card text-muted-foreground hover:border-foreground/40",
-                              )}
-                            >
-                              {i + 1}
-                            </button>
                             <Textarea
                               value={b}
                               rows={2}
-                              aria-label={`Editar tarjeta ${i + 1}`}
-                              placeholder={`Anuncio ${i + 1}…`}
-                              className={cn(
-                                "min-h-0 flex-1 rounded-xl border-2 text-base font-bold leading-snug sm:text-lg",
-                                i === slide.index &&
-                                  "border-amber-400 bg-amber-50 ring-2 ring-amber-400/40 dark:bg-amber-950/30",
-                                i < slide.index && "opacity-60",
-                              )}
+                              aria-label={`Editar punto ${i + 1}`}
+                              placeholder={`Punto ${i + 1}…`}
+                              className="min-h-0 flex-1 rounded-xl border-2 text-base font-bold leading-snug sm:text-lg"
                               onChange={(e) => {
                                 const arr = [...seg.bullets];
                                 arr[i] = e.target.value;
@@ -653,7 +718,7 @@ export default function PanelView() {
                               size="icon"
                               variant="ghost"
                               className="h-9 w-8 shrink-0"
-                              aria-label={`Quitar tarjeta ${i + 1}`}
+                              aria-label={`Quitar punto ${i + 1}`}
                               disabled={seg.bullets.length <= 1}
                               onClick={() =>
                                 updateSegment(seg.id, {
@@ -674,31 +739,31 @@ export default function PanelView() {
                           }
                         >
                           <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Agregar
-                          tarjeta
+                          punto
                         </Button>
                       </div>
 
                       <p className="text-xs text-muted-foreground">
-                        Lo que escribís acá se ve al instante en la pantalla, con letra
-                        gigante. Tocá un numerito para mostrar esa tarjeta; las ya
-                        mostradas quedan tachadas.
+                        Una sola tarjeta por momento: lo que escribís acá se ve al
+                        instante en la pantalla, con letra gigante, todos los puntos
+                        juntos.
                       </p>
                     </div>
                   ) : seg ? (
                     <div className="flex items-center justify-between gap-3 rounded-xl border border-dashed border-muted-foreground/40 bg-muted/30 p-3">
                       <div className="min-w-0">
                         <div className="text-xs font-bold uppercase tracking-wide text-muted-foreground">
-                          Tarjetas en pantalla
+                          Tarjeta en pantalla
                         </div>
                         <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
-                          ¿Este momento tiene avisos o puntos? Mostralos de a uno, con
-                          letra grande (ideal para anuncios).
+                          ¿Este momento tiene avisos o puntos? Mostralos en una sola
+                          tarjeta, con letra grande (ideal para anuncios).
                         </p>
                       </div>
                       <Switch
-                        checked={false}
+                        checked={!!seg.cards}
                         onCheckedChange={(v) => updateSegment(seg.id, { cards: v })}
-                        aria-label="Activar tarjetas grandes en este momento"
+                        aria-label="Activar la tarjeta grande en este momento"
                         className="shrink-0"
                       />
                     </div>
@@ -706,7 +771,6 @@ export default function PanelView() {
 
                   <p className="text-center text-xs text-muted-foreground">
                     Atajos: Espacio = iniciar/pausar · N = siguiente · R = reiniciar
-                    {cardsOn ? " · ← → = tarjetas" : ""} · ↑ ↓ = teleprompter
                   </p>
                 </>
               )}
@@ -740,141 +804,14 @@ export default function PanelView() {
           </Card>
         </div>
 
-        {/* Programa */}
-        <Card className="order-2 lg:order-1">
-          <CardHeader className="pb-3">
-            <div className="flex items-start justify-between gap-2">
-              <div>
-                <CardTitle className="text-base">Programa del culto</CardTitle>
-                <CardDescription>
-                  {state.segments.length} momentos · {fmtMin(totalMin)} en total
-                </CardDescription>
-              </div>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-8 shrink-0 text-muted-foreground"
-                title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
-                aria-label="Cargar plantilla sabática"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
-                    )
-                  ) {
-                    mutate((p) => ({ ...p, segments: defaultSegments(), slideIndex: 0 }));
-                  }
-                }}
-              >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
-              </Button>
-            </div>
-          </CardHeader>
-          <CardContent className="space-y-1.5">
-            <div className="max-h-[62vh] space-y-1.5 overflow-y-auto pr-1 scrollbar-thin">
-              {state.segments.map((x, i) => {
-                const isCurrent = i === state.currentIndex && state.status !== "finished";
-                const isDone = state.currentIndex >= 0 && i < state.currentIndex;
-                return (
-                  <div
-                    key={x.id}
-                    className={cn(
-                      "rounded-lg border p-2 transition-colors",
-                      isCurrent ? "border-foreground/25 bg-muted/70" : "bg-card",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span
-                        className={cn("h-2.5 w-2.5 shrink-0 rounded-full", COLORS[x.color].dot)}
-                        aria-hidden="true"
-                      />
-                      {isDone ? (
-                        <Check className="h-4 w-4 shrink-0 text-emerald-600" aria-hidden="true" />
-                      ) : isCurrent ? (
-                        <Play className="h-4 w-4 shrink-0" aria-hidden="true" />
-                      ) : (
-                        <span className="w-4 shrink-0 text-center text-xs text-muted-foreground">
-                          {i + 1}
-                        </span>
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div
-                          className={cn(
-                            "truncate text-sm font-medium",
-                            isDone && "line-through opacity-50",
-                          )}
-                        >
-                          {x.title}
-                        </div>
-                        <div className="truncate text-xs text-muted-foreground">
-                          {x.minutes} min
-                          {x.speaker ? ` · ${x.speaker}` : ""}
-                          {x.cards && x.bullets.length > 0
-                            ? " · tarjetas grandes"
-                            : x.layout === "script"
-                              ? " · con guion"
-                              : ""}
-                        </div>
-                      </div>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="h-8 w-8"
-                        aria-label={`Editar ${x.title}`}
-                        onClick={() => setEditingId(editingId === x.id ? null : x.id)}
-                      >
-                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
-                      </Button>
-                      <div className="flex flex-col">
-                        <button
-                          type="button"
-                          aria-label={`Subir ${x.title}`}
-                          disabled={i === 0}
-                          onClick={() => moveSegment(i, -1)}
-                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        >
-                          <ChevronUp className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                        <button
-                          type="button"
-                          aria-label={`Bajar ${x.title}`}
-                          disabled={i === state.segments.length - 1}
-                          onClick={() => moveSegment(i, 1)}
-                          className="text-muted-foreground hover:text-foreground disabled:opacity-30"
-                        >
-                          <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
-                        </button>
-                      </div>
-                    </div>
-                    {editingId === x.id ? (
-                      <div className="mt-2 border-t pt-3">
-                        <SegmentEditor
-                          seg={x}
-                          canDelete={state.segments.length > 1}
-                          onUpdate={(patch) => updateSegment(x.id, patch)}
-                          onDelete={() => removeSegment(x.id)}
-                          onJump={() => mutate((p) => jumpTo(p, i))}
-                        />
-                      </div>
-                    ) : null}
-                  </div>
-                );
-              })}
-            </div>
-            <Button variant="outline" className="w-full" onClick={addSegment}>
-              <Plus className="h-4 w-4" aria-hidden="true" /> Agregar momento
-            </Button>
-          </CardContent>
-        </Card>
-
         {/* Columna derecha */}
-        <div className="order-3 space-y-4">
+        <div className="space-y-4">
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
                 <MessageSquare className="h-4 w-4" aria-hidden="true" /> Mensajes al orador
               </CardTitle>
-              <CardDescription>Aparecen grandes en la pantalla del orador</CardDescription>
+              <CardDescription>Aparecen grandes en la pantalla de proyección</CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
               <div className="flex flex-wrap gap-1.5">
@@ -951,163 +888,6 @@ export default function PanelView() {
 
           <Card>
             <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <ScrollText className="h-4 w-4" aria-hidden="true" /> Teleprompter
-              </CardTitle>
-              <CardDescription>
-                Pantalla exclusiva para leer: letra gigante y avance manual desde acá
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Textarea
-                aria-label="Texto para el teleprompter"
-                placeholder={
-                  "Escribí acá lo que alguien va a leer.\nDejá un renglón en blanco para separar ideas."
-                }
-                className="min-h-[88px]"
-                value={prompterDraft}
-                onChange={(e) => setPrompterDraft(e.target.value)}
-              />
-              <div className="flex flex-wrap gap-1.5">
-                <Button
-                  size="sm"
-                  className="h-8"
-                  disabled={!prompterDraft.trim()}
-                  onClick={sendPrompter}
-                >
-                  <Send className="h-3.5 w-3.5" aria-hidden="true" /> Enviar al
-                  teleprompter
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8"
-                  disabled={!prompterTextOnScreen.trim() && !prompterDraft.trim()}
-                  onClick={clearPrompter}
-                >
-                  <X className="h-3.5 w-3.5" aria-hidden="true" /> Vaciar
-                </Button>
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="h-8"
-                  onClick={openPrompterWindow}
-                >
-                  <MonitorPlay className="h-3.5 w-3.5" aria-hidden="true" /> Abrir
-                  pantalla
-                </Button>
-              </div>
-
-              <Separator />
-
-              <div className="flex items-center justify-between gap-2">
-                <div className="text-xs font-medium text-muted-foreground">
-                  Avance del scroll (manual)
-                </div>
-                <div className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {Math.round(state.prompter.offset * 100)}%
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-10 w-10 shrink-0"
-                  aria-label="Volver al inicio del texto"
-                  onClick={prompterTop}
-                >
-                  <SkipBack className="h-4 w-4" aria-hidden="true" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-10 w-10 shrink-0"
-                  aria-label="Retroceder un paso"
-                  onClick={() => stepPrompter(-1)}
-                >
-                  <ArrowUp className="h-4 w-4" aria-hidden="true" />
-                </Button>
-                <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-10 w-10 shrink-0"
-                  aria-label="Avanzar un paso"
-                  onClick={() => stepPrompter(1)}
-                >
-                  <ArrowDown className="h-4 w-4" aria-hidden="true" />
-                </Button>
-                <Slider
-                  aria-label="Posición del texto"
-                  className="min-w-0 flex-1"
-                  value={[Math.round(state.prompter.offset * 100)]}
-                  min={0}
-                  max={100}
-                  step={1}
-                  onValueChange={(v) =>
-                    mutate((p) => prompterGo(p, (v[0] ?? 0) / 100))
-                  }
-                />
-              </div>
-
-              <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                <span className="shrink-0">Paso:</span>
-                <Select
-                  value={String(state.prompter.stepPct)}
-                  onValueChange={(v) =>
-                    mutate((p) => ({
-                      ...p,
-                      prompter: { ...p.prompter, stepPct: Number(v) },
-                    }))
-                  }
-                >
-                  <SelectTrigger className="h-8 w-[108px]">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {[10, 20, 25, 33, 50].map((n) => (
-                      <SelectItem key={n} value={String(n)}>
-                        {n}% de pantalla
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <div className="flex shrink-0 items-center gap-2">
-                  <span>Letra:</span>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    aria-label="Letra más chica"
-                    onClick={() => nudgeFont(-0.15)}
-                  >
-                    <Minus className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                  <span className="w-10 text-center font-mono tabular-nums">
-                    {Math.round(state.prompter.fontScale * 100)}%
-                  </span>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="h-8 w-8"
-                    aria-label="Letra más grande"
-                    onClick={() => nudgeFont(0.15)}
-                  >
-                    <Plus className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                </div>
-              </div>
-
-              <p className="text-xs text-muted-foreground">
-                En la pantalla de teleprompter no hay botones: todo se maneja desde
-                acá, también con las flechas <b>↑ ↓</b> del teclado. Si cerraste la
-                ventana, volvé a abrirla o entrá con <b>#teleprompter</b> al final de
-                la dirección.
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
               <CardTitle className="text-base">Ajustes de la pantalla</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -1169,7 +949,41 @@ export default function PanelView() {
             </CardContent>
           </Card>
         </div>
+        </div>
       </main>
+
+      {/* Editor de momento (modal) */}
+      <Dialog
+        open={!!editingSeg}
+        onOpenChange={(o) => {
+          if (!o) setEditingId(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar momento</DialogTitle>
+            <DialogDescription>
+              Los cambios se ven al instante en todas las pantallas.
+            </DialogDescription>
+          </DialogHeader>
+          {editingSeg ? (
+            <SegmentEditor
+              seg={editingSeg}
+              canDelete={state.segments.length > 1}
+              onUpdate={(patch) => updateSegment(editingSeg.id, patch)}
+              onDelete={() => {
+                removeSegment(editingSeg.id);
+                setEditingId(null);
+              }}
+              onJump={() => {
+                const idx = state.segments.findIndex((s) => s.id === editingSeg.id);
+                if (idx >= 0) mutate((p) => jumpTo(p, idx));
+                setEditingId(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1260,11 +1074,11 @@ function SegmentEditor({
       <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5">
         <div className="min-w-0">
           <Label htmlFor={`c-${seg.id}`} className="text-xs font-medium">
-            Tarjetas grandes en pantalla
+            Tarjeta grande en pantalla
           </Label>
           <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-            Muestra cada punto como una tarjeta sola, con letra grande, y se pasa de una
-            desde el panel. Ideal para los anuncios (anula el guion y el contador grande).
+            Muestra todos los puntos juntos en una sola tarjeta, con letra grande
+            (ideal para los anuncios; anula el guion y el contador grande).
           </p>
         </div>
         <Switch
@@ -1277,7 +1091,7 @@ function SegmentEditor({
 
       <div className="space-y-1.5">
         <Label className="text-xs">
-          {seg.cards ? "Tarjetas (una por pantalla)" : "Puntos clave"}
+          {seg.cards ? "Puntos de la tarjeta" : "Puntos clave"}
         </Label>
         {seg.bullets.map((b, i) => (
         <div key={i} className="flex gap-1.5">
@@ -1285,7 +1099,7 @@ function SegmentEditor({
               <Textarea
                 value={b}
                 rows={2}
-                aria-label={`Tarjeta ${i + 1}`}
+                aria-label={`Punto ${i + 1}`}
                 onChange={(e) => {
                   const arr = [...seg.bullets];
                   arr[i] = e.target.value;
@@ -1317,8 +1131,8 @@ function SegmentEditor({
         <div className="flex gap-1.5">
           <Input
             value={bulletDraft}
-            placeholder={seg.cards ? "Agregar tarjeta…" : "Agregar punto…"}
-            aria-label={seg.cards ? "Nueva tarjeta" : "Nuevo punto clave"}
+            placeholder="Agregar punto…"
+            aria-label="Nuevo punto clave"
             onChange={(e) => setBulletDraft(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") addBullet();
@@ -1328,7 +1142,7 @@ function SegmentEditor({
             size="icon"
             variant="outline"
             className="h-10 w-9 shrink-0"
-            aria-label={seg.cards ? "Agregar tarjeta" : "Agregar punto"}
+            aria-label="Agregar punto"
             onClick={addBullet}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
@@ -1338,13 +1152,13 @@ function SegmentEditor({
 
       <div className="space-y-1">
         <Label className="text-xs">
-          Guion extendido (teleprompter)
-          {seg.cards ? " — queda anulado mientras las tarjetas estén activas" : ""}
+          Guion extendido (se muestra en la pantalla de proyección)
+          {seg.cards ? " — queda anulado mientras la tarjeta esté activa" : ""}
         </Label>
         <Textarea
           value={seg.script}
           rows={4}
-          placeholder="Texto más largo que el orador puede leer en la pantalla exclusiva…"
+          placeholder="Texto más largo que se muestra en la pantalla de proyección…"
           onChange={(e) => onUpdate({ script: e.target.value })}
         />
       </div>
@@ -1395,40 +1209,46 @@ function HelpDialog() {
         <DialogHeader>
           <DialogTitle>Cómo usar con el proyector</DialogTitle>
           <DialogDescription>
-            Sistema de control de tiempos para el culto: contador, teleprompter y mensajes
+            Sistema de control de tiempos para el culto: contador, tarjetas y mensajes
             al orador.
           </DialogDescription>
         </DialogHeader>
         <ol className="list-decimal space-y-2.5 pl-5 text-sm">
           <li>
-            Tocá <b>“Abrir pantalla del orador”</b>: se abre una segunda ventana con el
-            contador y el guion (también podés abrir una pestaña nueva y tocar “Ver
-            pantalla”).
+            Tocá <b>“Abrir pantalla de proyección”</b> para la pantalla grande
+            (contador, tarjetas de avisos y mensajes) y{" "}
+            <b>“Abrir pantalla del predicador”</b> para la del predicador: ahí se ve la{" "}
+            <b>pastilla grande</b> con el momento y el tiempo grande debajo.
           </li>
           <li>
-            Arrastrá esa ventana al monitor del proyector y ponela en pantalla completa
-            con el botón <MaximizeIcon /> o con <b>F11</b>. En Windows:{" "}
+            Arrastrá cada ventana a su monitor y ponela en pantalla completa con el
+            botón <MaximizeIcon /> o con <b>F11</b>. En Windows:{" "}
             <b>Win + Shift + →</b> para moverla a la otra pantalla.
           </li>
           <li>
-            Volvé a esta ventana y manejá el culto: <b>Iniciar / Pausar / Siguiente</b>,
-            editá el guion de cada momento y enviá mensajes al orador.
+            Volvé a esta ventana y manejá el culto desde la <b>secuencia horizontal</b>{" "}
+            de arriba: tocá un momento para saltar a él, y editá cada uno con el{" "}
+            <b>lápiz</b>. Mensajes al orador en la columna de la derecha.
           </li>
         </ol>
         <Separator />
         <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-          <b>Anuncios grandes, de a uno:</b> en la sección <b>“Ahora”</b> activá el
-          interruptor <b>Tarjetas</b> y escribí cada anuncio ahí mismo, en su tarjeta:
-          se ve al instante en la pantalla con letra gigante. Pasás de una con los
-          botones o con <b>← →</b>, y lo ya mostrado queda tachado. Los avisos de un
-          momento futuro se preparan con el lápiz en “Programa del culto”.
+          <b>Avisos en una sola tarjeta:</b> en la sección <b>“Ahora”</b> activá el
+          interruptor <b>Tarjetas</b> y escribí los puntos ahí mismo: todos se ven
+          juntos en <b>una sola tarjeta gigante</b> en la pantalla de proyección, y los
+          vas editando en vivo. Los avisos de un momento futuro se preparan con el
+          lápiz de ese momento en la secuencia.
         </div>
         <Separator />
         <ul className="space-y-1.5 text-xs text-muted-foreground">
-          <li>· Las dos ventanas se sincronizan solas, en tiempo real.</li>
+          <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
           <li>
-            · El contador pasa de blanco a amarillo en los minutos finales y a rojo cuando
-            se cumple el tiempo.
+            · Los mensajes del operador salen en la pantalla de proyección; la pantalla
+            del predicador queda limpia, solo con la pastilla y el tiempo.
+          </li>
+          <li>
+            · El contador pasa de blanco a amarillo en los minutos finales y a rojo
+            cuando se cumple el tiempo.
           </li>
           <li>· Los datos quedan guardados en este navegador.</li>
         </ul>
