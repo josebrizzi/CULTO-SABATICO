@@ -1243,6 +1243,13 @@ function HelpDialog() {
         <ul className="space-y-1.5 text-xs text-muted-foreground">
           <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
           <li>
+            · La pantalla del predicador también muestra los versículos de{" "}
+            <b>Biblia Sincronizada</b> que elijas en su <b>admin.html</b>: aparecen
+            en vivo con el contador abajo. El servidor (por defecto
+            biblia-sincronizada.onrender.com) se cambia con el botón de engranaje
+            de esa pantalla.
+          </li>
+          <li>
             · Los mensajes del operador salen en la pantalla de proyección; la pantalla
             del predicador queda limpia, solo con la pastilla y el tiempo.
           </li>

@@ -51,8 +51,21 @@ Entrá a **https://github.com** → *Sign up* → creá tu cuenta gratis.
 > 💡 **El anunciador y el predicador no tocan nada:** la tarjeta de avisos se
 > escribe y se edita en vivo desde la vista “Ahora” del panel, y los mensajes se
 > sacan desde el panel. Todo es una sola vía: del panel hacia las pantallas.
-> La pantalla del predicador solo muestra la **pastilla grande** del momento y
-> el **tiempo grande debajo**, sin mensajes.
+> La pantalla del predicador muestra la **letra bíblica** que el predicador elija
+> en su app **Biblia Sincronizada** y, abajo, la **pastilla** con el momento y el
+> **tiempo grande**, sin mensajes.
+
+## La Biblia en la pantalla del predicador
+
+La pantalla `#predicador` se conecta sola a tu app **Biblia Sincronizada** (el servidor que tenés en Render, ya viene cargado: `biblia-sincronizada.onrender.com`).
+
+1. Abrí el `admin.html` de Biblia Sincronizada (la página de administrador de esa app).
+2. Elegí el versículo → aparece **en vivo arriba** en la pantalla del predicador (referencia tipo `JN 3:16 · RV60` + letra completa) y el **contador sigue abajo**.
+3. Con la **✕** de la esquina, el predicador quita el texto de su pantalla cuando ya no lo necesita.
+
+> 📗 Arriba a la derecha de esa pantalla hay un indicador con forma de libro: **verde** = conectado a la Biblia, **gris** = sin conexión (reintenta solo; si Render estaba dormido, demora ~1 minuto).
+>
+> 🔧 El servidor se cambia con el **botón de engranaje** de la pantalla del predicador.
 
 ## Para actualizar la app más adelante
 
