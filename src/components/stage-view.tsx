@@ -6,6 +6,7 @@ import { Maximize, MessageSquare, Music, PanelLeft } from "lucide-react";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { obtenerHimno, sendAudioEstado, useAudioStage, type AudioCmd } from "@/lib/himnos";
+import { VERSION_APP } from "@/lib/version";
 import {
   COLORS,
   cardsActive,
@@ -32,6 +33,8 @@ export default function StageView() {
     time: 0,
     dur: null,
     id: null,
+      /** El himno proyectado no tiene su MP3 guardado en ESTE navegador. */
+  const [mp3Falta, setMp3Falta] = useState(false);
   });
 
   const cargarAudio = async (himnoId: string): Promise<boolean> => {
@@ -287,6 +290,7 @@ export default function StageView() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-[2.5vw] py-[1.6vh] text-[1.8vh] text-zinc-500">
         <span className="font-medium uppercase tracking-[0.3em]">
           {state.serviceTitle}
+          <span className="font-mono text-zinc-600">{VERSION_APP}</span>
         </span>
         <span className="flex items-center gap-2">
           <span
@@ -633,7 +637,12 @@ export default function StageView() {
                 : ""}
             </span>
             <span className="flex items-center gap-2">
-              {audioVivo.playing && audioVivo.id === state.himno.id ? (
+            {mp3Falta && state.himno ? (
+                <span className="text-amber-300/90">
+                  Sin MP3 en esta compu — abrí esta pantalla en el mismo navegador
+                  donde cargaste los himnos
+                </span>
+              ) : audioVivo.playing && audioVivo.id === state.himno.id ? (
                 <>
                   <Music className="animate-pulse h-[2.2vh] w-[2.2vh] text-orange-300" aria-hidden="true" />
                   <span className="font-mono tabular-nums text-zinc-400">
