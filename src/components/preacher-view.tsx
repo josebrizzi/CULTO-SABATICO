@@ -30,7 +30,7 @@ import {
   phaseOf,
   useShowChannel,
 } from "@/lib/show";
-
+import { VERSION_APP } from "@/lib/version";
 /**
  * Pantalla del PREDICADOR:
  * - Arriba: la letra bíblica que el predicador elige en "Biblia Sincronizada"
@@ -319,6 +319,7 @@ export default function PreacherView() {
           {state.serviceTitle}
         </span>
         <span className="flex items-center gap-3">
+         <span className="font-mono text-zinc-600">{VERSION_APP}</span>
           <span className="flex items-center gap-1.5" title={estadoBibliaLabel}>
             <BookOpen
               className={cn(
