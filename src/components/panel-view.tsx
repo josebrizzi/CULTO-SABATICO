@@ -97,6 +97,7 @@ import {
   useNow,
   useShowChannel,
 } from "@/lib/show";
+import { VERSION_APP } from "@/lib/version";
 
 const QUICK_MESSAGES = [
   "Cerrá en 2 minutos",
@@ -519,6 +520,9 @@ export default function PanelView() {
               <Clock className="h-4 w-4" aria-hidden="true" />
             </div>
             <span className="hidden font-semibold md:block">Tiempos del Culto</span>
+                        <span className="rounded-md border border-muted-foreground/40 px-1.5 py-0.5 font-mono text-[10px] leading-none text-muted-foreground">
+              {VERSION_APP}
+            </span>
           </div>
           <Input
             aria-label="Nombre del culto"
