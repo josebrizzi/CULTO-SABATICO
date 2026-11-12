@@ -67,6 +67,27 @@ La pantalla `#predicador` se conecta sola a tu app **Biblia Sincronizada** (el s
 >
 > 🔧 El servidor se cambia con el **botón de engranaje** de la pantalla del predicador.
 
+## Himnos con música (letra + MP3)
+
+El panel tiene una sección **Himnos**: proyectá la letra del himno en la pantalla grande mientras suena el MP3.
+
+**Cargar los himnos (una sola vez):**
+
+1. Conectá el pendrive y abrí la sección **Himnos** del panel.
+2. Tocá **Cargar MP3** y elegí los archivos — podés seleccionar muchos juntos.
+3. El número y el título salen del nombre del archivo (ej.: `001 - Alabad al Señor.mp3` → himno **1**, “Alabad al Señor”).
+4. Con el **lápiz** de cada fila escribís la letra: cada estrofa separada por una línea en blanco.
+
+> 💾 Los MP3 **quedan guardados en el navegador** de esa computadora (no se suben a ningún lado, no hace falta Firebase). Si cambiás de compu o borrás los datos del navegador, los cargás otra vez desde el pendrive.
+
+**En el culto:**
+
+- Tocá **Proyectar** en el himno → la pantalla muestra “HIMNO n”, el título y la primera estrofa.
+- Tocá **▶** para que suene (la primera vez, tocá una vez la pantalla de proyección para habilitar el sonido).
+- Cambiá la estrofa con ‹ › o con las teclas **← →**; pausá o detengá con los botones del panel.
+- El volumen se ajusta en la misma sección (100/75/50/25 %).
+- Opcional: en el **lápiz de cada momento** elegí “Himno de este momento” → al llegar a él, el himno se proyecta solo. Al pasar a un momento sin himno, se quita solo.
+
 ## Para actualizar la app más adelante
 
 Volvé a hacer el paso 3 (subir archivos): arrastrá los archivos cambiados, **Commit changes**, y GitHub lo republica solo en un par de minutos.

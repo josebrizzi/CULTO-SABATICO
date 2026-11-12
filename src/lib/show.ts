@@ -17,6 +17,8 @@ export interface Segment {
   color: ColorKey;
   /** Mostrar los puntos como tarjetas grandes, una por vez (ideal para anuncios) */
   cards: boolean;
+  /** Himno asociado (se proyecta solo al llegar a este momento) */
+  himnoId?: string | null;
 }
 
 export interface StageMessage {
@@ -34,6 +36,17 @@ export interface Settings {
   autoAdvance: boolean;
   /** Mostrar los puntos clave en la pantalla cuando el momento está en modo contador */
   showBulletsOnTimer: boolean;
+  /** Volumen del audio de los himnos (0 a 1) */
+  volumeHimno: number;
+}
+
+/** Himno que está proyectado en este momento en la pantalla grande. */
+export interface HimnoProyectado {
+  id: string;
+  numero: number | null;
+  titulo: string;
+  estrofas: string[];
+  estrofa: number;
 }
 
 export interface ShowState {
@@ -49,6 +62,8 @@ export interface ShowState {
   elapsedBefore: number;
   message: StageMessage | null;
   settings: Settings;
+  /** Himno proyectado ahora (con letra incluida para que la pantalla no lea IndexedDB) */
+  himno: HimnoProyectado | null;
   updatedAt: number;
 }
 
@@ -199,7 +214,9 @@ export function defaultState(): ShowState {
       blink: true,
       autoAdvance: true,
       showBulletsOnTimer: true,
+      volumeHimno: 1,
     },
+    himno: null,
     updatedAt: Date.now(),
   };
 }
@@ -247,6 +264,14 @@ function normalize(raw: unknown): ShowState | null {
       blink?: unknown;
       autoAdvance?: unknown;
       showBulletsOnTimer?: unknown;
+      volumeHimno?: unknown;
+    } | null;
+    himno?: {
+      id?: unknown;
+      numero?: unknown;
+      titulo?: unknown;
+      estrofas?: unknown;
+      estrofa?: unknown;
     } | null;
     updatedAt?: unknown;
   };
@@ -273,6 +298,7 @@ function normalize(raw: unknown): ShowState | null {
       : "emerald",
     // Migración: los momentos llamados "Anuncios" pasan a tarjetas automáticamente
     cards: asBool(x.cards, /anunci/i.test(asStr(x.title, ""))),
+    himnoId: asStr(x.himnoId, "") || null,
   }));
   // Migración de plantilla: si el programa guardado sigue siendo el ejemplo viejo
   // (sin personalizar), traer el programa sabático nuevo.
@@ -303,7 +329,20 @@ function normalize(raw: unknown): ShowState | null {
       blink: asBool(r.settings?.blink, true),
       autoAdvance: asBool(r.settings?.autoAdvance, true),
       showBulletsOnTimer: asBool(r.settings?.showBulletsOnTimer, true),
+      volumeHimno: clamp(asNum(r.settings?.volumeHimno, 1), 0, 1),
     },
+    himno:
+      r.himno && typeof r.himno.id === "string"
+        ? {
+            id: String(r.himno.id),
+            numero: typeof r.himno.numero === "number" ? r.himno.numero : null,
+            titulo: asStr(r.himno.titulo, ""),
+            estrofas: Array.isArray(r.himno.estrofas)
+              ? r.himno.estrofas.map(String)
+              : [],
+            estrofa: Math.max(0, Math.trunc(asNum(r.himno.estrofa, 0))),
+          }
+        : null,
     updatedAt: asNum(r.updatedAt, Date.now()),
   };
 }
@@ -637,5 +676,6 @@ export function resetService(s: ShowState): ShowState {
     startedAt: null,
     elapsedBefore: 0,
     message: null,
+    himno: null,
   };
 }

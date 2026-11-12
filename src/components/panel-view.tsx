@@ -5,6 +5,8 @@ import {
   AlertTriangle,
   Check,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   ChevronUp,
   Clock,
   ExternalLink,
@@ -13,6 +15,7 @@ import {
   Minus,
   MonitorPlay,
   MonitorSpeaker,
+  Music,
   Pencil,
   Pause,
   Play,
@@ -21,7 +24,9 @@ import {
   Send,
   SkipBack,
   SkipForward,
+  Square,
   Trash2,
+  Volume2,
   X,
 } from "lucide-react";
 
@@ -57,6 +62,17 @@ import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
+  agregarHimnoDesdeArchivo,
+  borrarHimno,
+  guardarEstrofas,
+  juntarEstrofas,
+  listarHimnos,
+  partirEstrofas,
+  sendAudioCmd,
+  useAudioEstado,
+  type HimnoRegistro,
+} from "@/lib/himnos";
+import {
   advance,
   back,
   COLORS,
@@ -88,6 +104,13 @@ const QUICK_MESSAGES = [
   "Vamos a la ofrenda",
   "Cerrá con oración",
 ];
+
+function fmtDur(seg: number | null): string {
+  if (seg == null || !Number.isFinite(seg)) return "";
+  const m = Math.floor(seg / 60);
+  const s = Math.floor(seg % 60);
+  return `${m}:${String(s).padStart(2, "0")}`;
+}
 
 export default function PanelView() {
   const { state, mutate, peerOnline } = useShowChannel("panel");
@@ -229,6 +252,132 @@ export default function PanelView() {
     mutate((p) => ({ ...p, message: { id: uid(), text: t, urgent } }));
   };
 
+  /* ═══════════════════ Himnos con música ═══════════════════ */
+
+  const [himnos, setHimnos] = useState<HimnoRegistro[]>([]);
+  const [cargandoHimnos, setCargandoHimnos] = useState(true);
+  const [filtroHimno, setFiltroHimno] = useState("");
+  const [editandoHimnoId, setEditandoHimnoId] = useState<string | null>(null);
+  const [borrandoHimnoId, setBorrandoHimnoId] = useState<string | null>(null);
+  const audioEstado = useAudioEstado();
+  const audioEstadoRef = useRef(audioEstado);
+  useEffect(() => {
+    audioEstadoRef.current = audioEstado;
+  }, [audioEstado]);
+  const himnosRef = useRef(himnos);
+  useEffect(() => {
+    himnosRef.current = himnos;
+  }, [himnos]);
+
+  const himnosFiltrados = useMemo(() => {
+    const q = filtroHimno.trim().toLowerCase();
+    if (!q) return himnos;
+    return himnos.filter((h) => `${h.numero ?? ""} ${h.titulo}`.toLowerCase().includes(q));
+  }, [himnos, filtroHimno]);
+
+  const editandoHimno = himnos.find((h) => h.id === editandoHimnoId) ?? null;
+
+  const recargarHimnos = () => {
+    listarHimnos().then(setHimnos).finally(() => setCargandoHimnos(false));
+  };
+  useEffect(() => {
+    recargarHimnos();
+  }, []);
+
+  const inputMp3Ref = useRef<HTMLInputElement | null>(null);
+  const onArchivosMp3 = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const audios = Array.from(files).filter(
+      (f) => /audio\//.test(f.type) || /\.(mp3|wav|ogg|m4a|aac|flac)$/i.test(f.name),
+    );
+    for (const f of audios) {
+      try {
+        await agregarHimnoDesdeArchivo(f);
+      } catch {
+        /* ignorar archivo problemático */
+      }
+    }
+    recargarHimnos();
+    window.setTimeout(recargarHimnos, 3000);
+  };
+
+  const proyectarHimno = (h: HimnoRegistro, estrofa = 0) => {
+    mutate((p) => ({
+      ...p,
+      himno: {
+        id: h.id,
+        numero: h.numero,
+        titulo: h.titulo,
+        estrofas: h.estrofas,
+        estrofa: Math.min(estrofa, Math.max(0, h.estrofas.length - 1)),
+      },
+    }));
+  };
+
+  const cambiarEstrofa = (delta: number) => {
+    mutate((p) => {
+      if (!p.himno || p.himno.estrofas.length === 0) return p;
+      const n = Math.min(
+        p.himno.estrofas.length - 1,
+        Math.max(0, p.himno.estrofa + delta),
+      );
+      return { ...p, himno: { ...p.himno, estrofa: n } };
+    });
+  };
+
+  const quitarHimno = () => {
+    sendAudioCmd({ accion: "stop" });
+    mutate((p) => ({ ...p, himno: null }));
+  };
+
+  const tocarHimno = (h: HimnoRegistro) => {
+    const est = audioEstadoRef.current;
+    const esEste = est && est.himnoId === h.id;
+    if (esEste && est.playing) {
+      sendAudioCmd({ accion: "pause" });
+      return;
+    }
+    sendAudioCmd({
+      accion: "play",
+      himnoId: h.id,
+      time: esEste ? est.time : undefined,
+      volume: stateRef.current.settings.volumeHimno,
+    });
+  };
+
+  const detenerHimno = () => sendAudioCmd({ accion: "stop" });
+
+  const setVolumenHimno = (v: number) => {
+    setSettings({ volumeHimno: v });
+    sendAudioCmd({ accion: "volume", volume: v });
+  };
+
+  /* Himno asociado al momento actual: se proyecta solo al llegar a él */
+  const autoHimnoRef = useRef<{ segId: string; himnoId: string } | null>(null);
+  useEffect(() => {
+    const s = stateRef.current;
+    const cur = s.currentIndex >= 0 ? s.segments[s.currentIndex] : null;
+    if (autoHimnoRef.current && (!cur || cur.id !== autoHimnoRef.current.segId)) {
+      if (s.himno?.id === autoHimnoRef.current.himnoId) {
+        sendAudioCmd({ accion: "stop" });
+        mutate((p) => ({ ...p, himno: null }));
+      }
+      autoHimnoRef.current = null;
+    }
+    if (cur?.himnoId) {
+      if (s.himno?.id === cur.himnoId) {
+        autoHimnoRef.current = { segId: cur.id, himnoId: cur.himnoId };
+      } else {
+        const h = himnosRef.current.find((x) => x.id === cur.himnoId);
+        if (h) {
+          proyectarHimno(h, 0);
+          autoHimnoRef.current = { segId: cur.id, himnoId: h.id };
+        }
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.currentIndex, state.segments, state.himno, himnos]);
+
   /* ────────────── Pantalla del predicador ────────────── */
 
   const openPreacherWindow = () => {
@@ -261,6 +410,12 @@ export default function PanelView() {
         }
       } else if (e.code === "KeyR") {
         if (s.currentIndex >= 0) mutate((p) => resetCurrent(p, Date.now()));
+      } else if (s.himno && e.code === "ArrowRight") {
+        e.preventDefault();
+        cambiarEstrofa(1);
+      } else if (s.himno && e.code === "ArrowLeft") {
+        e.preventDefault();
+        cambiarEstrofa(-1);
       }
     };
     window.addEventListener("keydown", onKey);
@@ -888,6 +1043,251 @@ export default function PanelView() {
 
           <Card>
             <CardHeader className="pb-3">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Music className="h-4 w-4" aria-hidden="true" /> Himnos con música
+                  </CardTitle>
+                  <CardDescription>
+                    Letra y audio en la pantalla de proyección. Los MP3 quedan
+                    guardados en este navegador.
+                  </CardDescription>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  <input
+                    ref={inputMp3Ref}
+                    type="file"
+                    accept="audio/*,.mp3,.wav,.ogg,.m4a,.aac,.flac"
+                    multiple
+                    hidden
+                    aria-label="Cargar archivos MP3 de himnos"
+                    onChange={(e) => {
+                      onArchivosMp3(e.target.files);
+                      e.target.value = "";
+                    }}
+                  />
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    onClick={() => inputMp3Ref.current?.click()}
+                  >
+                    <Plus className="h-3.5 w-3.5" aria-hidden="true" /> Cargar MP3
+                  </Button>
+                  <Select
+                    value={String(state.settings.volumeHimno)}
+                    onValueChange={(v) => setVolumenHimno(Number(v))}
+                  >
+                    <SelectTrigger
+                      className="h-8 w-[100px]"
+                      aria-label="Volumen de los himnos"
+                    >
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">100%</SelectItem>
+                      <SelectItem value="0.75">75%</SelectItem>
+                      <SelectItem value="0.5">50%</SelectItem>
+                      <SelectItem value="0.25">25%</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {cargandoHimnos ? (
+                <p className="py-3 text-center text-sm text-muted-foreground">
+                  Cargando himnos…
+                </p>
+              ) : himnos.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-muted-foreground/40 p-4 text-center text-sm leading-relaxed text-muted-foreground">
+                  Todavía no hay himnos. Tocá <b>Cargar MP3</b> y elegí los
+                  archivos del pendrive — podés elegir muchos de una vez: el
+                  número y el título salen del nombre del archivo (ej.:
+                  <span className="mx-1 font-mono text-xs">001 - Alabad al Señor.mp3</span>).
+                </div>
+              ) : (
+                <>
+                  <Input
+                    aria-label="Buscar himno"
+                    placeholder="Buscar por número o título…"
+                    value={filtroHimno}
+                    onChange={(e) => setFiltroHimno(e.target.value)}
+                    className="h-9"
+                  />
+                  <div className="max-h-[320px] space-y-1.5 overflow-y-auto pr-1">
+                    {himnosFiltrados.map((h) => {
+                      const enPantalla = state.himno?.id === h.id;
+                      const suena =
+                        audioEstado?.himnoId === h.id && audioEstado.playing;
+                      return (
+                        <div
+                          key={h.id}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-lg border p-2",
+                            enPantalla &&
+                              "border-amber-400/60 bg-amber-400/5",
+                          )}
+                        >
+                          <span className="w-9 shrink-0 text-center text-sm font-bold text-muted-foreground">
+                            {h.numero ?? "♪"}
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="truncate text-sm font-semibold">
+                              {h.titulo}
+                            </div>
+                            <div className="truncate text-[11px] text-muted-foreground">
+                              {[
+                                h.duracion ? fmtDur(h.duracion) : null,
+                                h.estrofas.length
+                                  ? `${h.estrofas.length} estrofas`
+                                  : null,
+                                enPantalla ? "en pantalla" : null,
+                              ]
+                                .filter(Boolean)
+                                .join(" · ") || "\u00A0"}
+                            </div>
+                          </div>
+                          {enPantalla && h.estrofas.length > 0 ? (
+                            <div className="flex shrink-0 items-center gap-0.5">
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                aria-label="Estrofa anterior"
+                                onClick={() => cambiarEstrofa(-1)}
+                              >
+                                <ChevronLeft className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                              <span className="w-9 text-center text-[11px] font-medium text-muted-foreground">
+                                {(state.himno?.estrofa ?? 0) + 1}/
+                                {h.estrofas.length}
+                              </span>
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7"
+                                aria-label="Estrofa siguiente"
+                                onClick={() => cambiarEstrofa(1)}
+                              >
+                                <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          ) : null}
+                          <div className="flex shrink-0 items-center gap-0.5">
+                            {enPantalla ? (
+                              <>
+                                <Button
+                                  size="icon"
+                                  variant={suena ? "secondary" : "outline"}
+                                  className="h-7 w-7"
+                                  aria-label={
+                                    suena ? "Pausar música" : "Reproducir música"
+                                  }
+                                  onClick={() => tocarHimno(h)}
+                                >
+                                  {suena ? (
+                                    <Pause className="h-3.5 w-3.5" aria-hidden="true" />
+                                  ) : (
+                                    <Play className="h-3.5 w-3.5" aria-hidden="true" />
+                                  )}
+                                </Button>
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="h-7 w-7"
+                                  aria-label="Detener música"
+                                  onClick={detenerHimno}
+                                >
+                                  <Square className="h-3 w-3" aria-hidden="true" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-7 px-2 text-xs"
+                                  onClick={quitarHimno}
+                                >
+                                  Quitar
+                                </Button>
+                              </>
+                            ) : (
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => proyectarHimno(h, 0)}
+                              >
+                                Proyectar
+                              </Button>
+                            )}
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-7 w-7"
+                              aria-label={`Editar letra de ${h.titulo}`}
+                              title="Editar letra (estrofas)"
+                              onClick={() => setEditandoHimnoId(h.id)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                            {borrandoHimnoId === h.id ? (
+                              <Button
+                                size="icon"
+                                variant="destructive"
+                                className="h-7 w-7"
+                                aria-label="Confirmar borrado del himno"
+                                title="Confirmar borrado"
+                                onClick={() => {
+                                  borrarHimno(h.id).then(recargarHimnos);
+                                  setBorrandoHimnoId(null);
+                                }}
+                              >
+                                <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            ) : (
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="h-7 w-7 text-muted-foreground hover:text-red-600"
+                                aria-label={`Borrar ${h.titulo}`}
+                                title="Borrar himno"
+                                onClick={() => setBorrandoHimnoId(h.id)}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {audioEstado ? (
+                    <p className="text-xs text-muted-foreground">
+                      {audioEstado.playing ? "♪ Sonando " : "Pausado "}
+                      {fmtDur(audioEstado.time)}
+                      {audioEstado.dur
+                        ? ` / ${fmtDur(audioEstado.dur)}`
+                        : ""}{" "}
+                      — el sonido sale por la pantalla de proyección.
+                    </p>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">
+                      Proyectá un himno y toca ▶ para que suene en la pantalla
+                      grande (la primera vez, tocá una vez la pantalla para
+                      habilitar el sonido).
+                    </p>
+                  )}
+                </>
+              )}
+              <p className="text-xs text-muted-foreground">
+                Asociá un himno a un momento con el lápiz de la secuencia: al
+                llegar a ese momento se proyecta solo. Teclas ← → cambian la
+                estrofa.
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">Ajustes de la pantalla</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -970,6 +1370,7 @@ export default function PanelView() {
             <SegmentEditor
               seg={editingSeg}
               canDelete={state.segments.length > 1}
+              himnos={himnos}
               onUpdate={(patch) => updateSegment(editingSeg.id, patch)}
               onDelete={() => {
                 removeSegment(editingSeg.id);
@@ -984,6 +1385,88 @@ export default function PanelView() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Editor de letra de un himno */}
+      <Dialog
+        open={!!editandoHimno}
+        onOpenChange={(o) => {
+          if (!o) setEditandoHimnoId(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Letra del himno</DialogTitle>
+            <DialogDescription>
+              Escribí las estrofas separadas por una línea en blanco. Después
+              se navegan con ‹ › o con las teclas ← →.
+            </DialogDescription>
+          </DialogHeader>
+          {editandoHimno ? (
+            <EstrofasEditor
+              himno={editandoHimno}
+              onCerrar={() => setEditandoHimnoId(null)}
+              onSave={(texto) => {
+                const estrofas = partirEstrofas(texto);
+                const idActual = editandoHimno.id;
+                guardarEstrofas(idActual, estrofas).then(() => {
+                  recargarHimnos();
+                  // Si ese himno está proyectado, refrescar la letra en pantalla
+                  mutate((p) =>
+                    p.himno?.id === idActual
+                      ? {
+                          ...p,
+                          himno: {
+                            ...p.himno,
+                            estrofas,
+                            estrofa: Math.min(
+                              p.himno.estrofa,
+                              Math.max(0, estrofas.length - 1),
+                            ),
+                          },
+                        }
+                      : p,
+                  );
+                });
+                setEditandoHimnoId(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ─────────────────────── Editor de estrofas ─────────────────────── */
+
+function EstrofasEditor({
+  himno,
+  onSave,
+  onCerrar,
+}: {
+  himno: HimnoRegistro;
+  onSave: (texto: string) => void;
+  onCerrar: () => void;
+}) {
+  const [texto, setTexto] = useState(() => juntarEstrofas(himno.estrofas));
+  return (
+    <div className="space-y-3">
+      <Textarea
+        value={texto}
+        rows={12}
+        aria-label={`Letra de ${himno.titulo}`}
+        placeholder={"Primera estrofa…\n\nSegunda estrofa…"}
+        className="font-mono text-sm"
+        onChange={(e) => setTexto(e.target.value)}
+      />
+      <div className="flex justify-end gap-2">
+        <Button size="sm" variant="outline" onClick={onCerrar}>
+          Cerrar
+        </Button>
+        <Button size="sm" onClick={() => onSave(texto)}>
+          <Check className="h-3.5 w-3.5" aria-hidden="true" /> Guardar letra
+        </Button>
+      </div>
     </div>
   );
 }
@@ -996,12 +1479,14 @@ function SegmentEditor({
   onDelete,
   onJump,
   canDelete,
+  himnos,
 }: {
   seg: Segment;
   onUpdate: (patch: Partial<Segment>) => void;
   onDelete: () => void;
   onJump: () => void;
   canDelete: boolean;
+  himnos: HimnoRegistro[];
 }) {
   const [bulletDraft, setBulletDraft] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -1069,6 +1554,31 @@ function SegmentEditor({
             <SelectItem value="script">Guion + contador abajo</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">Himno de este momento (opcional)</Label>
+        <Select
+          value={seg.himnoId || "_sin"}
+          onValueChange={(v) => onUpdate({ himnoId: v === "_sin" ? null : v })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="max-h-[280px]">
+            <SelectItem value="_sin">Sin himno</SelectItem>
+            {himnos.map((h) => (
+              <SelectItem key={h.id} value={h.id}>
+                {h.numero != null ? `${h.numero} · ` : ""}
+                {h.titulo}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          Al llegar a este momento, el himno se proyecta solo (el audio se
+          arranca con el botón ▶ en la sección Himnos).
+        </p>
       </div>
 
       <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5">
@@ -1258,6 +1768,13 @@ function HelpDialog() {
             cuando se cumple el tiempo.
           </li>
           <li>· Los datos quedan guardados en este navegador.</li>
+          <li>
+            · <b>Himnos con música:</b> cargá los MP3 del pendrive en la sección
+            Himnos (quedan guardados en este navegador), escribí la letra con el
+            lápiz y tocá <b>Proyectar</b>: la pantalla grande muestra la estrofa
+            y suena el audio. También podés asociar un himno a cada momento con
+            el lápiz de la secuencia, para que se proyecte solo al llegar a él.
+          </li>
         </ul>
       </DialogContent>
     </Dialog>

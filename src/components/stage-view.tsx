@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Maximize, MessageSquare, PanelLeft } from "lucide-react";
+import { Maximize, MessageSquare, Music, PanelLeft } from "lucide-react";
 
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { obtenerHimno, sendAudioEstado, useAudioStage, type AudioCmd } from "@/lib/himnos";
 import {
   COLORS,
   cardsActive,
@@ -20,6 +21,108 @@ import {
 
 export default function StageView() {
   const { state, peerOnline } = useShowChannel("stage");
+
+  /* ═══ Audio de himnos: la pantalla reproduce, el panel ordena ═══ */
+
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const urlHimnoRef = useRef<string | null>(null);
+  const himnoCargadoRef = useRef<string | null>(null);
+  const [audioVivo, setAudioVivo] = useState<{ playing: boolean; time: number; dur: number | null; id: string | null }>({
+    playing: false,
+    time: 0,
+    dur: null,
+    id: null,
+  });
+
+  const cargarAudio = async (himnoId: string): Promise<boolean> => {
+    if (himnoCargadoRef.current === himnoId && urlHimnoRef.current) return true;
+    const reg = await obtenerHimno(himnoId);
+    if (!reg) return false;
+    if (urlHimnoRef.current) URL.revokeObjectURL(urlHimnoRef.current);
+    const url = URL.createObjectURL(reg.blob);
+    urlHimnoRef.current = url;
+    himnoCargadoRef.current = himnoId;
+    const a = audioRef.current;
+    if (a) a.src = url;
+    return true;
+  };
+
+  const reportarAudio = () => {
+    const a = audioRef.current;
+    if (!a || !himnoCargadoRef.current) return;
+    const playing = !a.paused && !a.ended;
+    setAudioVivo({
+      playing,
+      time: a.currentTime || 0,
+      dur: Number.isFinite(a.duration) ? a.duration : null,
+      id: himnoCargadoRef.current,
+    });
+    sendAudioEstado({
+      himnoId: himnoCargadoRef.current,
+      playing,
+      time: a.currentTime || 0,
+      dur: Number.isFinite(a.duration) ? a.duration : null,
+    });
+  };
+
+  const handleAudioCmd = (cmd: AudioCmd) => {
+    const a = audioRef.current;
+    if (!a) return;
+    if (cmd.accion === "volume") {
+      a.volume = Math.min(1, Math.max(0, cmd.volume ?? 1));
+      return;
+    }
+    if (cmd.accion === "pause") {
+      a.pause();
+      reportarAudio();
+      return;
+    }
+    if (cmd.accion === "stop") {
+      a.pause();
+      try {
+        a.currentTime = 0;
+      } catch {
+        /* ignorar */
+      }
+      reportarAudio();
+      return;
+    }
+    // play
+    const id = cmd.himnoId;
+    if (!id) return;
+    cargarAudio(id).then((ok) => {
+      const el = audioRef.current;
+      if (!ok || !el) return;
+      el.volume = Math.min(1, Math.max(0, cmd.volume ?? 1));
+      if (typeof cmd.time === "number") {
+        try {
+          el.currentTime = Math.max(0, cmd.time);
+        } catch {
+          /* ignorar */
+        }
+      }
+      el.play().catch(() => {
+        /* sin gesto del usuario todavía: queda pendiente hasta armar */
+      });
+    });
+  };
+
+  const sonidoArmado = useAudioStage(handleAudioCmd);
+
+  // Reportar al panel mientras suena
+  useEffect(() => {
+    const a = audioRef.current;
+    if (!a) return;
+    const evs: (keyof HTMLMediaElementEventMap)[] = [
+      "timeupdate",
+      "playing",
+      "pause",
+      "ended",
+      "loadedmetadata",
+    ];
+    evs.forEach((e) => a.addEventListener(e as string, reportarAudio));
+    return () => evs.forEach((e) => a.removeEventListener(e as string, reportarAudio));
+  }, []);
 
   const [now, setNow] = useState(0);
   useEffect(() => {
@@ -148,6 +251,17 @@ export default function StageView() {
 
   const first = state.segments[0];
   const totalMin = state.segments.reduce((a, x) => a + x.minutes, 0);
+
+  /* Letra de la estrofa: tamaño adaptable al largo */
+  function estrofaFontSize(text: string): string {
+    const len = text.length;
+    const lines = text.split("\n").length;
+    const capLenW = len <= 120 ? "4.4vw" : len <= 260 ? "3.6vw" : len <= 440 ? "3vw" : "2.5vw";
+    const capLenH = len <= 120 ? "6.2vh" : len <= 260 ? "5.2vh" : len <= 440 ? "4.4vh" : "3.7vh";
+    const capLinesH =
+      lines <= 2 ? "6.2vh" : lines <= 4 ? "5.4vh" : lines <= 6 ? "4.7vh" : lines <= 8 ? "4vh" : "3.4vh";
+    return `min(${capLenW}, ${capLenH}, ${capLinesH})`;
+  }
 
   const statusLabel =
     state.status === "finished"
@@ -478,6 +592,70 @@ export default function StageView() {
         </div>
       ) : null}
 
+      {/* ── Himno proyectado: letra + audio (tapa los demás modos) ── */}
+      {state.himno ? (
+        <div className="absolute inset-0 z-10 flex flex-col bg-black">
+          <div className="flex flex-1 flex-col items-center justify-center px-[5vw] pb-[2vh] pt-[7vh] text-center">
+            <div
+              key={state.himno.id}
+              className="animate-card-in font-black uppercase tracking-[0.28em] text-orange-300"
+              style={{ fontSize: "min(2.6vw, 3.6vh)" }}
+            >
+              {state.himno.numero != null ? `Himno ${state.himno.numero}` : "Himno"}
+            </div>
+            <div
+              key={`t-${state.himno.id}`}
+              className="animate-card-in mt-[1vh] max-w-[90vw] font-bold leading-tight text-zinc-100"
+              style={{ fontSize: "min(3.6vw, 5vh)" }}
+            >
+              {state.himno.titulo}
+            </div>
+            {state.himno.estrofas.length > 0 ? (
+              <div
+                key={`e-${state.himno.estrofa}`}
+                className="animate-card-in mt-[3vh] max-w-[88vw] whitespace-pre-line font-semibold leading-[1.42] text-white"
+                style={{ fontSize: estrofaFontSize(state.himno.estrofas[state.himno.estrofa] || "") }}
+              >
+                {state.himno.estrofas[state.himno.estrofa] || ""}
+              </div>
+            ) : (
+              <div className="mt-[3vh] text-[2.6vh] text-zinc-600">
+                Sin letra cargada — escribila desde el panel (lápiz en la fila del himno)
+              </div>
+            )}
+          </div>
+
+          {/* Pie: estrofa, audio y tiempo del momento */}
+          <div className="flex shrink-0 items-center justify-between px-[4vw] pb-[2.2vh] text-[2vh] text-zinc-500">
+            <span>
+              {state.himno.estrofas.length > 0
+                ? `${state.himno.estrofa + 1} / ${state.himno.estrofas.length}`
+                : ""}
+            </span>
+            <span className="flex items-center gap-2">
+              {audioVivo.playing && audioVivo.id === state.himno.id ? (
+                <>
+                  <Music className="animate-pulse h-[2.2vh] w-[2.2vh] text-orange-300" aria-hidden="true" />
+                  <span className="font-mono tabular-nums text-zinc-400">
+                    {fmtHMS(Math.floor(audioVivo.time))} / {audioVivo.dur ? fmtHMS(Math.floor(audioVivo.dur)) : "--:--"}
+                  </span>
+                </>
+              ) : null}
+            </span>
+            <span className="font-mono tabular-nums">
+              {active && live ? (phase === "overtime" ? `+${fmtHMS(Math.floor(overtimeMs / 1000))}` : fmtHMS(Math.ceil(remaining / 1000))) : ""}
+            </span>
+          </div>
+
+          {/* Aviso para habilitar el sonido (hasta que alguien toca la página) */}
+          {!sonidoArmado ? (
+            <div className="absolute bottom-[8vh] left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/20 bg-zinc-900/90 px-[2.4vw] py-[1.2vh] text-[2vh] font-medium text-zinc-300 backdrop-blur">
+              Tocá una vez esta pantalla para habilitar el sonido
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {/* ── Mensaje del operador ── */}
       {state.message ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-[5vw]">
@@ -505,6 +683,9 @@ export default function StageView() {
           </div>
         </div>
       ) : null}
+
+      {/* Reproductor de audio (siempre presente, invisible) */}
+      <audio ref={audioRef} preload="auto" className="hidden" aria-hidden="true" />
 
       {/* ── Controles flotantes (se ocultan solos) ── */}
       <div
