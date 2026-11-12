@@ -479,7 +479,11 @@ export function useShowChannel(role: Role): {
     lastPersistedRef.current = chosen.updatedAt;
     skipPersistRef.current = true;
     if (chosen !== stateRef.current) {
-      window.setTimeout(() => setState(chosen), 0);
+      const elegido = chosen;
+      window.setTimeout(() => {
+        // Si mientras tanto llegó por canal un estado más nuevo, no pisarlo.
+        if (isNewer(elegido, stateRef.current)) setState(elegido);
+      }, 0);
     }
     if (role === "panel") {
       saveLocal(chosen);
