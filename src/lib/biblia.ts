@@ -19,12 +19,19 @@ const LS_URL = "bibliaServidorUrl";
 
 /* ─────────────────────────── Tipos ─────────────────────────── */
 
+/** Una palabra del versículo: t = texto, h = color de resaltado ("" = sin marcar). */
+export interface PalabraBiblia {
+  t: string;
+  h?: string;
+}
+
 export interface VersoBiblia {
   bookName: string;
   chapter: number;
   verse: number;
   version: string;
-  words: string[];
+  /** El admin de Biblia Sincronizada manda objetos { t, h } (y a veces strings). */
+  words: (string | PalabraBiblia)[];
 }
 
 export type MensajeBiblia =
@@ -85,7 +92,11 @@ export function abreviarVersion(v: string): string {
 }
 
 export function textoDelVerso(v: VersoBiblia): string {
-  return (v.words || []).join(" ").trim();
+  return (v.words || [])
+    .map((w) => (typeof w === "string" ? w : String(w?.t ?? "")))
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 export function referenciaDelVerso(v: VersoBiblia): string {
@@ -124,7 +135,7 @@ interface ProyeccionMsg {
   type: string;
   data?: {
     type: string;
-    words?: string[];
+    words?: (string | PalabraBiblia)[];
     bookName?: string;
     chapter?: number;
     verse?: number;
@@ -196,7 +207,7 @@ export function useBibliaSocket(url: string): {
                 chapter: Number(d.chapter) || 0,
                 verse: Number(d.verse) || 0,
                 version: String(d.version || ""),
-                words: d.words.map(String),
+                words: Array.isArray(d.words) ? d.words : [],
               },
             });
           } else if (d.type === "freeText" && typeof d.html === "string") {
