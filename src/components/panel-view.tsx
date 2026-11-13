@@ -775,4 +775,899 @@ export default function PanelView() {
                   <span className="text-xs text-muted-foreground">Último momento</span>
                 ) : (
                   upcoming.map(({ x, i }) => (
-                    <Badge key={x.id} variant="outline" className="gap-1.5 font-norma
+                    <Badge key={x.id} variant="outline" className="gap-1.5 font-normal">
+                      <span
+                        className={cn("h-2 w-2 rounded-full", COLORS[x.color].dot)}
+                        aria-hidden="true"
+                      />
+                      {i + 1}. {x.title} · {x.minutes} min
+                    </Badge>
+                  ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Columna derecha */}
+        <div className="space-y-4">
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MonitorSpeaker className="h-4 w-4" aria-hidden="true" /> Pantalla del
+                predicador
+              </CardTitle>
+              <CardDescription>
+                Mini pantalla en vivo: se ve acá lo mismo que se proyecta ahora
+                mismo. Tocala para abrirla en grande.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div
+                title="Abrir la pantalla del predicador"
+                onClick={openPreacherWindow}
+                className="cursor-pointer"
+              >
+                <MiniPantalla state={state} now={now} biblia={bibliaViva} />
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base">
+                <MessageSquare className="h-4 w-4" aria-hidden="true" /> Mensajes al orador
+              </CardTitle>
+              <CardDescription>
+                En la pantalla del predicador se ve SOLO el mensaje, gigante y sin
+                leyendas
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="flex gap-2">
+                <Input
+                  aria-label="Mensaje personalizado"
+                  placeholder="Escribir mensaje…"
+                  value={msgDraft}
+                  onChange={(e) => setMsgDraft(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      sendMessage(msgDraft, msgUrgent);
+                      setMsgDraft("");
+                    }
+                  }}
+                />
+                <Button
+                  size="icon"
+                  aria-label="Enviar mensaje"
+                  className="h-10 w-10 shrink-0"
+                  onClick={() => {
+                    sendMessage(msgDraft, msgUrgent);
+                    setMsgDraft("");
+                  }}
+                >
+                  <Send className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="msg-urgent"
+                  checked={msgUrgent}
+                  onCheckedChange={setMsgUrgent}
+                />
+                <Label htmlFor="msg-urgent" className="text-sm font-normal">
+                  Urgente (rojo, para llamar la atención)
+                </Label>
+              </div>
+              <Separator />
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 text-xs text-muted-foreground">
+                  {state.message ? (
+                    <span className="line-clamp-2">
+                      En pantalla: <b>“{state.message.text}”</b>
+                    </span>
+                  ) : (
+                    "Sin mensaje en pantalla"
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="h-8 shrink-0"
+                  disabled={!state.message}
+                  onClick={() => mutate((p) => ({ ...p, message: null }))}
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpiar
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Ajustes de la pantalla</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="warning-min" className="text-sm font-normal">
+                  Aviso amarillo
+                </Label>
+                <Select
+                  value={String(state.settings.warningMin)}
+                  onValueChange={(v) => setSettings({ warningMin: Number(v) })}
+                >
+                  <SelectTrigger id="warning-min" className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Sin aviso</SelectItem>
+                    <SelectItem value="1">1 min antes</SelectItem>
+                    <SelectItem value="2">2 min antes</SelectItem>
+                    <SelectItem value="3">3 min antes</SelectItem>
+                    <SelectItem value="5">5 min antes</SelectItem>
+                    <SelectItem value="10">10 min antes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="set-blink" className="text-sm font-normal">
+                  Parpadear cuando el tiempo está cumplido
+                </Label>
+                <Switch
+                  id="set-blink"
+                  checked={state.settings.blink}
+                  onCheckedChange={(v) => setSettings({ blink: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="set-auto" className="text-sm font-normal">
+                  Auto-iniciar el siguiente momento
+                </Label>
+                <Switch
+                  id="set-auto"
+                  checked={state.settings.autoAdvance}
+                  onCheckedChange={(v) => setSettings({ autoAdvance: v })}
+                />
+              </div>
+              <div className="flex items-center justify-between gap-2">
+                <Label htmlFor="set-bullets" className="text-sm font-normal">
+                  Mostrar puntos clave en modo contador
+                </Label>
+                <Switch
+                  id="set-bullets"
+                  checked={state.settings.showBulletsOnTimer}
+                  onCheckedChange={(v) => setSettings({ showBulletsOnTimer: v })}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Cada momento puede mostrarse en modo “Contador grande” o “Guion + contador
+                abajo” (se cambia en la edición del momento).
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+        </div>
+      </main>
+
+      {/* Editor de momento (modal) */}
+      <Dialog
+        open={!!editingSeg}
+        onOpenChange={(o) => {
+          if (!o) setEditingId(null);
+        }}
+      >
+        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar momento</DialogTitle>
+            <DialogDescription>
+              Los cambios se ven al instante en la pantalla del predicador.
+            </DialogDescription>
+          </DialogHeader>
+          {editingSeg ? (
+            <SegmentEditor
+              seg={editingSeg}
+              canDelete={state.segments.length > 1}
+              onUpdate={(patch) => updateSegment(editingSeg.id, patch)}
+              onDelete={() => {
+                removeSegment(editingSeg.id);
+                setEditingId(null);
+              }}
+              onJump={() => {
+                const idx = state.segments.findIndex((s) => s.id === editingSeg.id);
+                if (idx >= 0) mutate((p) => jumpTo(p, idx));
+                setEditingId(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+    </div>
+  );
+}
+
+/* ─────────────────────── Editor de momento ─────────────────────── */
+
+function SegmentEditor({
+  seg,
+  onUpdate,
+  onDelete,
+  onJump,
+  canDelete,
+}: {
+  seg: Segment;
+  onUpdate: (patch: Partial<Segment>) => void;
+  onDelete: () => void;
+  onJump: () => void;
+  canDelete: boolean;
+}) {
+  const [bulletDraft, setBulletDraft] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const addBullet = () => {
+    const t = bulletDraft.trim();
+    if (!t) return;
+    onUpdate({ bullets: [...seg.bullets, t] });
+    setBulletDraft("");
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2 space-y-1">
+          <Label htmlFor={`t-${seg.id}`} className="text-xs">
+            Título
+          </Label>
+          <Input
+            id={`t-${seg.id}`}
+            value={seg.title}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`s-${seg.id}`} className="text-xs">
+            Orador
+          </Label>
+          <Input
+            id={`s-${seg.id}`}
+            value={seg.speaker}
+            placeholder="Ej.: Anunciador"
+            onChange={(e) => onUpdate({ speaker: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`m-${seg.id}`} className="text-xs">
+            Duración (min)
+          </Label>
+          <Input
+            id={`m-${seg.id}`}
+            type="number"
+            min={1}
+            max={600}
+            value={seg.minutes}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) onUpdate({ minutes: Math.min(600, Math.max(1, Math.round(v))) });
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">Cómo se muestra en la pantalla</Label>
+        <Select
+          value={seg.layout}
+          onValueChange={(v) => onUpdate({ layout: v === "script" ? "script" : "timer" })}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="timer">Contador grande</SelectItem>
+            <SelectItem value="script">Guion + contador abajo</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5">
+        <div className="min-w-0">
+          <Label htmlFor={`c-${seg.id}`} className="text-xs font-medium">
+            Tarjeta grande en pantalla
+          </Label>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            Muestra todos los puntos juntos en una sola tarjeta, con letra grande
+            (ideal para los anuncios; anula el guion y el contador grande).
+          </p>
+        </div>
+        <Switch
+          id={`c-${seg.id}`}
+          checked={seg.cards}
+          onCheckedChange={(v) => onUpdate({ cards: v })}
+          className="mt-0.5 shrink-0"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">
+          {seg.cards ? "Puntos de la tarjeta" : "Puntos clave"}
+        </Label>
+        {seg.bullets.map((b, i) => (
+        <div key={i} className="flex gap-1.5">
+            {seg.cards ? (
+              <Textarea
+                value={b}
+                rows={2}
+                aria-label={`Punto ${i + 1}`}
+                onChange={(e) => {
+                  const arr = [...seg.bullets];
+                  arr[i] = e.target.value;
+                  onUpdate({ bullets: arr });
+                }}
+              />
+            ) : (
+              <Input
+                value={b}
+                aria-label={`Punto ${i + 1}`}
+                onChange={(e) => {
+                  const arr = [...seg.bullets];
+                  arr[i] = e.target.value;
+                  onUpdate({ bullets: arr });
+                }}
+              />
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-10 w-9 shrink-0 self-start"
+              aria-label={`Quitar punto ${i + 1}`}
+              onClick={() => onUpdate({ bullets: seg.bullets.filter((_, j) => j !== i) })}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ))}
+        <div className="flex gap-1.5">
+          <Input
+            value={bulletDraft}
+            placeholder="Agregar punto…"
+            aria-label="Nuevo punto clave"
+            onChange={(e) => setBulletDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addBullet();
+            }}
+          />
+          <Button
+            size="icon"
+            variant="outline"
+            className="h-10 w-9 shrink-0"
+            aria-label="Agregar punto"
+            onClick={addBullet}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">
+          Guion extendido (se muestra en la pantalla del predicador)
+          {seg.cards ? " — queda anulado mientras la tarjeta esté activa" : ""}
+        </Label>
+        <Textarea
+          value={seg.script}
+          rows={4}
+          placeholder="Texto más largo que se muestra en la pantalla del predicador…"
+          onChange={(e) => onUpdate({ script: e.target.value })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <Button size="sm" variant="secondary" onClick={onJump}>
+          <SkipForward className="h-3.5 w-3.5" aria-hidden="true" /> Ir a este momento
+        </Button>
+        {canDelete ? (
+          confirmDelete ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                onDelete();
+                setConfirmDelete(false);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Confirmar
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-red-600 hover:text-red-600"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar
+            </Button>
+          )
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────── Ayuda ─────────────────────────────── */
+
+function HelpDialog() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost" aria-label="Ayuda de uso">
+          <HelpCircle className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Cómo usar con el proyector</DialogTitle>
+          <DialogDescription>
+            Sistema de control de tiempos para el culto: contador, tarjetas y mensajes
+            al orador.
+          </DialogDescription>
+        </DialogHeader>
+        <ol className="list-decimal space-y-2.5 pl-5 text-sm">
+          <li>
+            Tocá <b>“Abrir pantalla del predicador”</b>: es la única pantalla — hace
+            de proyección y de pantalla del predicador a la vez. Con un solo monitor,
+            abrí esa y listo: muestra el contador, las tarjetas de avisos, la letra
+            bíblica y los mensajes.
+          </li>
+          <li>
+            Ponela en pantalla completa con el botón de la esquina (o con <b>F11</b>)
+            y proyectala al monitor o TV de la iglesia.
+          </li>
+          <li>
+            Volvé a esta ventana y manejá el culto desde la <b>secuencia horizontal</b>{" "}
+            de arriba: tocá un momento para saltar a él, y editá cada uno con el{" "}
+            <b>lápiz</b>. Mensajes al orador en la columna de la derecha.
+          </li>
+        </ol>
+        <Separator />
+        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
+          <b>Avisos en una sola tarjeta:</b> en la sección <b>“Ahora”</b> activá el
+          interruptor <b>Tarjetas</b> y escribí los puntos ahí mismo: todos se ven
+          juntos en <b>una sola tarjeta gigante</b> en la pantalla del predicador, y los
+          vas editando en vivo. Los avisos de un momento futuro se preparan con el
+          lápiz de ese momento en la secuencia.
+        </div>
+        <Separator />
+        <ul className="space-y-1.5 text-xs text-muted-foreground">
+          <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
+          <li>
+            · Los versículos de <b>Biblia Sincronizada</b> (elegidos en su{" "}
+            <b>admin.html</b>) aparecen en vivo con el contador abajo, cortados en
+            partes de 4 renglones igual que la proyección: tocá el texto o usá ← →
+            para cambiar de parte. El servidor se cambia con el engranaje de esa
+            pantalla.
+          </li>
+          <li>
+            · Los mensajes del operador también salen en esta pantalla, encima de
+            todo lo demás: solo se ve el mensaje (rojo si es urgente, amarillo si
+            no), sin títulos ni leyendas.
+          </li>
+          <li>
+            · La <b>mini pantalla</b> de la columna derecha muestra en vivo lo que
+            se ve en la pantalla del predicador (letra bíblica, tarjeta, contador
+            y mensajes).
+          </li>
+          <li>
+            · El contador pasa de blanco a amarillo en los minutos finales y a rojo
+            cuando se cumple el tiempo.
+          </li>
+          <li>· Los datos quedan guardados en este navegador.</li>
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ────────────── Mini pantalla del predicador (incrustada) ────────────── */
+
+/* Tamaño de diseño de la mini pantalla: 320×180 (16:9). Todo lo de adentro
+   se dibuja en píxeles de este espacio y después se escala al ancho real de
+   la tarjeta, así la replica se ve igual en cualquier ancho de columna. */
+const MINI_ANCHO = 320;
+const MINI_ALTO = 180;
+
+/** Mide el ancho disponible y devuelve cuánto hay que escalar el diseño. */
+function useFitScale(base: number) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / base);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [base]);
+  return { ref, scale };
+}
+
+/* Barra inferior en chico: momento a la izquierda + contador a la derecha. */
+function MiniBarra({
+  seg,
+  counterText,
+  counterColor,
+  progressValue,
+  progressClass,
+  paused,
+  grande,
+}: {
+  seg: Segment;
+  counterText: string;
+  counterColor: string;
+  progressValue: number;
+  progressClass: string;
+  paused: boolean;
+  /** true = como en el modo biblia: contador bien grande a la derecha */
+  grande?: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1 pb-1">
+          <div
+            className={cn(
+              "min-w-0 max-w-[46%] truncate rounded-full border-2 px-2 font-black uppercase leading-none tracking-wide",
+              COLORS[seg.color].chipDark,
+            )}
+            style={{ fontSize: 8, paddingTop: 3, paddingBottom: 3 }}
+          >
+            {seg.title}
+          </div>
+          {paused ? (
+            <div
+              className="shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
+              style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+            >
+              Pausa
+            </div>
+          ) : null}
+        </div>
+        <div
+          className={cn(
+            "shrink-0 font-mono font-bold tabular-nums leading-none",
+            counterColor,
+          )}
+          style={{ fontSize: grande ? 32 : 22 }}
+        >
+          {counterText}
+        </div>
+      </div>
+      <Progress
+        value={progressValue}
+        className={cn("mt-1 h-[3px] bg-white/10", progressClass)}
+      />
+    </div>
+  );
+}
+
+/** Réplica en chico de la pantalla del predicador: muestra lo mismo que se
+    proyecta en ese momento — letra bíblica, tarjeta de avisos, guion,
+    contador grande y mensajes del operador. */
+function MiniPantalla({
+  state,
+  now,
+  biblia,
+}: {
+  state: ShowState;
+  now: number;
+  biblia: BibliaDisplay | null;
+}) {
+  const { ref, scale } = useFitScale(MINI_ANCHO);
+
+  const seg = currentSegment(state);
+  const active = state.currentIndex >= 0 && seg !== null;
+  const totalMs = (seg?.minutes ?? 0) * 60000;
+  const elapsed = active ? elapsedCurrent(state, now) : 0;
+  const remaining = active ? totalMs - elapsed : 0;
+  const overtimeMs = active ? Math.max(0, elapsed - totalMs) : 0;
+  const phase = active ? phaseOf(remaining, state.settings.warningMin) : "idle";
+  const live = now > 0 && active;
+  const cardsOn = active && cardsActive(seg);
+  const mode = seg?.layout ?? "timer";
+  const paused = state.status === "paused";
+
+  const counterText = live
+    ? phase === "overtime"
+      ? `+${fmtHMS(Math.floor(overtimeMs / 1000))}`
+      : fmtHMS(Math.ceil(remaining / 1000))
+    : "--:--";
+  const counterColor =
+    phase === "overtime"
+      ? "text-red-500"
+      : phase === "warning"
+        ? "text-amber-300"
+        : "text-white";
+  const progressValue = totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0;
+  const progressClass =
+    phase === "overtime"
+      ? "[&>div]:bg-red-500"
+      : phase === "warning"
+        ? "[&>div]:bg-amber-400"
+        : "[&>div]:bg-white/80";
+
+  const msg = state.message;
+
+  /* Contenido: lo mismo que muestra la pantalla del predicador, en chico */
+  let contenido: ReactNode = null;
+
+  if (msg) {
+    // Mensaje del operador: SOLO el texto (rojo o amarillo), como en grande
+    const len = msg.text.length;
+    contenido = (
+      <div className="absolute inset-0 flex items-center justify-center p-2.5">
+        <div
+          className={cn(
+            "flex h-full w-full items-center justify-center rounded-2xl px-2.5 text-center font-black leading-[1.1]",
+            msg.urgent ? "bg-red-600 text-white" : "bg-amber-400 text-zinc-950",
+          )}
+        >
+          <span style={{ fontSize: len <= 24 ? 36 : len <= 60 ? 26 : 19 }}>
+            {msg.text}
+          </span>
+        </div>
+      </div>
+    );
+  } else if (biblia) {
+    // Letra bíblica (con el tiempo abajo si el culto está en marcha)
+    contenido = (
+      <div className="absolute inset-0 flex flex-col">
+        <div className="flex min-h-0 flex-1 flex-col px-4 pb-1 pt-2.5">
+          <div className="flex items-end justify-between gap-1.5">
+            <div
+              className="min-w-0 truncate font-bold uppercase tracking-wider text-amber-300"
+              style={{ fontSize: 10 }}
+            >
+              {biblia.ref}
+              {biblia.version ? (
+                <span
+                  className="font-semibold tracking-normal text-amber-200/70"
+                  style={{ fontSize: 8 }}
+                >
+                  {" · "}
+                  {biblia.version}
+                </span>
+              ) : null}
+            </div>
+            {biblia.totalPartes > 1 ? (
+              <div
+                className="shrink-0 rounded-full border border-amber-300/40 bg-amber-300/10 px-1.5 font-bold text-amber-200"
+                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+              >
+                Parte {biblia.parte} de {biblia.totalPartes}
+              </div>
+            ) : null}
+          </div>
+          <div
+            className="mt-1 min-h-0 flex-1 overflow-hidden font-semibold leading-[1.28] text-white [&_em]:text-amber-200 [&_strong]:text-amber-200"
+            style={{ fontSize: 13 }}
+            dangerouslySetInnerHTML={{ __html: biblia.html }}
+          />
+        </div>
+        {active && seg ? (
+          <div className="shrink-0 px-4 pb-2">
+            <MiniBarra
+              seg={seg}
+              counterText={counterText}
+              counterColor={counterColor}
+              progressValue={progressValue}
+              progressClass={progressClass}
+              paused={paused}
+              grande
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  } else if (state.status === "finished") {
+    contenido = (
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <div className="font-bold text-white" style={{ fontSize: 16 }}>
+          Culto finalizado
+        </div>
+        <div className="mt-1 text-zinc-500" style={{ fontSize: 8 }}>
+          Reiniciá desde el panel para un nuevo culto.
+        </div>
+      </div>
+    );
+  } else if (!active) {
+    const first = state.segments[0];
+    contenido = (
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+        <div className="font-bold leading-tight text-white" style={{ fontSize: 13 }}>
+          El culto comienza pronto
+        </div>
+        {first ? (
+          <div className="mt-1.5 text-zinc-400" style={{ fontSize: 8 }}>
+            Primer momento: <b>{first.title}</b> · {first.minutes} min
+          </div>
+        ) : null}
+      </div>
+    );
+  } else if (cardsOn && seg) {
+    // Tarjeta grande de avisos: todos los puntos juntos
+    const bullets = seg.bullets;
+    const fuente =
+      bullets.length <= 1 ? 30 : bullets.length <= 3 ? 21 : bullets.length <= 5 ? 15 : bullets.length <= 7 ? 11 : 9;
+    contenido = (
+      <div className="absolute inset-0 flex flex-col">
+        <div className="flex items-center gap-1.5 px-4 pt-3">
+          <span
+            className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COLORS[seg.color].dot)}
+          />
+          <div className="truncate font-bold text-zinc-200" style={{ fontSize: 9 }}>
+            {seg.title}
+          </div>
+          {paused ? (
+            <div
+              className="ml-auto shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
+              style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+            >
+              En pausa
+            </div>
+          ) : null}
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center px-3">
+          <div className="text-center font-bold leading-[1.3] text-white">
+            {bullets.map((b, i) => (
+              <div key={i} style={{ fontSize: fuente }}>
+                {b}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-4 py-2">
+          <MiniBarra
+            seg={seg}
+            counterText={counterText}
+            counterColor={counterColor}
+            progressValue={progressValue}
+            progressClass={progressClass}
+            paused={paused}
+          />
+        </div>
+      </div>
+    );
+  } else if (mode === "script" && seg) {
+    // Guion + contador abajo (si no hay guion, los puntos numerados)
+    const lineas = seg.script.split("\n").filter((l) => l.trim());
+    const nLineas = Math.max(1, lineas.length || seg.bullets.length || 1);
+    const fuente = Math.min(22, Math.max(8, ((60 / nLineas - 3.2) / 1.35) * 1.8));
+    contenido = (
+      <div className="absolute inset-0 flex flex-col">
+        <div className="px-4 pt-3">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COLORS[seg.color].dot)}
+            />
+            <div className="truncate font-bold text-zinc-200" style={{ fontSize: 9 }}>
+              {seg.title}
+            </div>
+            {paused ? (
+              <div
+                className="ml-auto shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
+                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+              >
+                En pausa
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden px-4 pt-2">
+          {lineas.length > 0 ? (
+            lineas.slice(0, 6).map((line, i) => (
+              <p
+                key={i}
+                className="mb-1.5 font-medium text-zinc-100"
+                style={{ fontSize: fuente, lineHeight: 1.35 }}
+              >
+                {line}
+              </p>
+            ))
+          ) : seg.bullets.length > 0 ? (
+            seg.bullets.slice(0, 6).map((b, i) => (
+              <p
+                key={i}
+                className="mb-1.5 font-bold text-zinc-100"
+                style={{ fontSize: Math.max(fuente, 10), lineHeight: 1.3 }}
+              >
+                {i + 1}. {b}
+              </p>
+            ))
+          ) : (
+            <p className="text-zinc-600" style={{ fontSize: 8 }}>
+              El guion de este momento está vacío.
+            </p>
+          )}
+        </div>
+        <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-4 py-2">
+          <MiniBarra
+            seg={seg}
+            counterText={counterText}
+            counterColor={counterColor}
+            progressValue={progressValue}
+            progressClass={progressClass}
+            paused={paused}
+          />
+        </div>
+      </div>
+    );
+  } else if (seg) {
+    // Contador grande
+    contenido = (
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-3 pb-3 text-center">
+        <div className="font-bold tracking-wide text-zinc-200" style={{ fontSize: 10 }}>
+          {seg.title}
+        </div>
+        {paused ? (
+          <div
+            className="mt-1 rounded-full bg-amber-400 px-2 font-bold uppercase tracking-widest text-amber-950"
+            style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+          >
+            En pausa
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            "mt-1 font-mono font-bold tabular-nums leading-none",
+            counterColor,
+          )}
+          style={{ fontSize: 52 }}
+        >
+          {counterText}
+        </div>
+        <div className="mt-2 w-3/4">
+          <Progress
+            value={progressValue}
+            className={cn("h-[3px] bg-white/10", progressClass)}
+          />
+        </div>
+        {state.settings.showBulletsOnTimer && seg.bullets.length > 0 ? (
+          <div className="absolute bottom-2 left-3 right-3 flex flex-wrap items-center justify-center gap-1">
+            {seg.bullets.slice(0, 3).map((b, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "max-w-[45%] truncate rounded-full border px-1.5",
+                  COLORS[seg.color].chipDark,
+                )}
+                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+              >
+                {b}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="relative w-full select-none overflow-hidden rounded-xl border-2 border-white/15 bg-black"
+      style={{ aspectRatio: "16 / 9" }}
+    >
+      <div
+        className="absolute left-0 top-0 origin-top-left"
+        style={{
+          width: MINI_ANCHO,
+          height: MINI_ALTO,
+          transform: scale > 0 ? `scale(${scale})` : undefined,
+          opacity: scale > 0 ? 1 : 0,
+        }}
+      >
+        {contenido}
+      </div>
+    </div>
+  );
+}
