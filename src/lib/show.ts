@@ -27,6 +27,21 @@ export interface StageMessage {
   urgent: boolean;
 }
 
+/** Espejo de la letra bíblica que se está mostrando en la pantalla del
+ *  predicador. La pantalla del predicador lo publica por el canal y el
+ *  panel lo usa para la mini pantalla incrustada (lo mismo que se ve
+ *  en la proyección, en chico). */
+export interface BibliaDisplay {
+  ref: string;
+  version: string;
+  html: string;
+  /** Parte que se ve ahora (empezando en 1) */
+  parte: number;
+  totalPartes: number;
+  /** ms en que la pantalla del predicador generó este espejo */
+  ts: number;
+}
+
 export interface Settings {
   /** Minutos restantes en los que el contador se pone amarillo (0 = sin aviso) */
   warningMin: number;
@@ -67,7 +82,9 @@ export interface ShowState {
   updatedAt: number;
 }
 
-export type StageAction = { type: "CLEAR_MESSAGE" };
+export type StageAction =
+  | { type: "CLEAR_MESSAGE" }
+  | { type: "STAGE_BIBLIA"; biblia: BibliaDisplay | null };
 
 type Wire =
   | { t: "state"; from: string; state: ShowState }
@@ -387,9 +404,13 @@ export function useShowChannel(role: Role): {
   applyLocal: (fn: (s: ShowState) => ShowState) => void;
   sendAction: (action: StageAction) => void;
   peerOnline: boolean;
+  /** Espejo de la letra bíblica mostrada en la pantalla del predicador
+   *  (solo lo actualiza la pantalla del predicador; el panel lo lee). */
+  bibliaProyectada: BibliaDisplay | null;
 } {
   const [state, setState] = useState<ShowState>(() => defaultState());
   const [peerOnline, setPeerOnline] = useState(false);
+  const [bibliaProyectada, setBibliaProyectada] = useState<BibliaDisplay | null>(null);
   const [clientId] = useState<string>(() => uid());
 
   const stateRef = useRef(state);
@@ -466,6 +487,8 @@ export function useShowChannel(role: Role): {
       if (m.t === "action" && role === "panel") {
         if (m.action.type === "CLEAR_MESSAGE") {
           mutate((s) => ({ ...s, message: null }));
+        } else if (m.action.type === "STAGE_BIBLIA") {
+          setBibliaProyectada(m.action.biblia ?? null);
         }
       }
       };
@@ -530,7 +553,7 @@ export function useShowChannel(role: Role): {
     }
   }, [state, role, clientId]);
 
-  return { state, mutate, applyLocal, sendAction, peerOnline };
+  return { state, mutate, applyLocal, sendAction, peerOnline, bibliaProyectada };
 }
 
 /* ─────────────────────── Lógica del cronómetro ───────────────────── */
