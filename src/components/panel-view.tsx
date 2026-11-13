@@ -358,12 +358,6 @@ export default function PanelView() {
               {VERSION_APP}
             </span>
           </div>
-          <Input
-            aria-label="Nombre del culto"
-            value={state.serviceTitle}
-            onChange={(e) => mutate((p) => ({ ...p, serviceTitle: e.target.value }))}
-            className="h-9 w-40 sm:w-52"
-          />
           <div className="ml-auto flex items-center gap-2">
             <Badge
               variant={peerOnline ? "default" : "outline"}
