@@ -1,9 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   BookOpen,
   Maximize,
+  MessageSquare,
   PanelLeft,
   Settings2,
   X,
@@ -15,13 +23,13 @@ import {
   BIBLIA_URL_DEFECTO,
   abreviarVersion,
   referenciaDelVerso,
-  textoDelVerso,
   urlBibliaGuardada,
   guardarUrlBiblia,
   useBibliaSocket,
 } from "@/lib/biblia";
 import {
   COLORS,
+  cardsActive,
   currentSegment,
   elapsedCurrent,
   fmtHMS,
@@ -32,16 +40,124 @@ import {
 } from "@/lib/show";
 import { VERSION_APP } from "@/lib/version";
 
+/* useLayoutEffect solo existe en el navegador; en el build estático se usa
+   useEffect para que React no proteste al prerenderizar. */
+const useIsoLayoutEffect =
+  typeof window !== "undefined" ? useLayoutEffect : useEffect;
+
+/* ═════════════ Paginación del texto bíblico (igual que la proyección) ═════════════
+   Misma lógica que proyeccion.html de Biblia Sincronizada: máximo 4 renglones
+   por parte, cortando en partes casi iguales y prefiriendo cortar después de
+   un signo de puntuación (. , ; : ? !). Así el predicador ve EXACTAMENTE las
+   mismas partes que se proyectan, y además le avisa al admin (el teléfono)
+   cómo quedó cortado el versículo, igual que hacía la pantalla de proyección. */
+
+const MAX_LINEAS = 4;
+
+interface Palabra {
+  t: string;
+  h: string;
+}
+
+function escapeHtml(s: string): string {
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function palabrasAHtml(
+  palabras: Palabra[],
+  desdeNum: number,
+  hastaNum: number,
+): string {
+  // Acotado defensivo: los rangos viejos pueden ser más largos que el
+  // versículo nuevo (por un instante, hasta que se vuelve a medir).
+  const hasta = Math.min(Math.max(0, hastaNum), palabras.length);
+  const desde = Math.max(0, Math.min(desdeNum, hasta));
+  let html = "";
+  let colorAbierto = "";
+  for (let i = desde; i < hasta; i++) {
+    const w = palabras[i];
+    if (!w) continue;
+    if (w.h && w.h !== colorAbierto) {
+      if (colorAbierto) html += "</mark>";
+      html += `<mark style="background-color:${w.h}">`;
+      colorAbierto = w.h;
+    } else if (!w.h && colorAbierto) {
+      html += "</mark>";
+      colorAbierto = "";
+    }
+    html += escapeHtml(w.t);
+    if (i < hasta - 1) html += " ";
+  }
+  if (colorAbierto) html += "</mark>";
+  return html;
+}
+
+/** Corta las palabras en N partes casi iguales, prefiriendo los cortes
+    después de signos de puntuación (igual que la proyección). */
+function cortarEnN(palabras: Palabra[], N: number): [number, number][] {
+  const total = palabras.reduce((a, w) => a + w.t.length + 1, 0);
+  const objetivo = total / N;
+  const cortes: number[] = [];
+  let acc = 0;
+  let nextCut = 1;
+  for (let i = 0; i < palabras.length && cortes.length < N - 1; i++) {
+    acc += palabras[i].t.length + 1;
+    if (acc >= objetivo && i < palabras.length - 1) {
+      let mejor = i;
+      const ventana = Math.max(2, Math.floor(palabras.length * 0.05));
+      for (let d = 0; d <= ventana; d++) {
+        const izq = i - d;
+        const der = i + d;
+        if (
+          izq > nextCut &&
+          izq < palabras.length - 1 &&
+          /[.,;:?!]$/.test(palabras[izq - 1].t)
+        ) {
+          mejor = izq;
+          break;
+        }
+        if (
+          der < palabras.length - 1 &&
+          der > nextCut &&
+          /[.,;:?!]$/.test(palabras[der - 1].t)
+        ) {
+          mejor = der;
+          break;
+        }
+      }
+      cortes.push(mejor);
+      nextCut = mejor + 1;
+      acc = 0;
+    }
+  }
+  const rangos: [number, number][] = [];
+  let desde = 0;
+  cortes.forEach((c) => {
+    rangos.push([desde, c]);
+    desde = c;
+  });
+  rangos.push([desde, palabras.length]);
+  return rangos;
+}
+
 /**
- * Pantalla del PREDICADOR:
- * - Arriba: la letra bíblica que el predicador elige en "Biblia Sincronizada"
- *   (admin.html de su otra app); llega por WebSocket en vivo.
- * - Abajo: la pastilla con el momento actual y el tiempo grande.
- * Sin mensajes del operador y sin tarjetas: eso queda en la pantalla de
- * proyección (#pantalla).
+ * Pantalla del PREDICADOR — la única pantalla de la app (también hace de
+ * proyección). Con un solo monitor se abre esta y listo.
+ *
+ * - Si el predicador proyecta un versículo desde "Biblia Sincronizada"
+ *   (admin.html de su otra app), muestra el texto ARRIBA cortado en partes
+ *   de 4 renglones (igual que la proyección), con el badge "Parte X de Y",
+ *   y el tiempo del momento abajo (pastilla + contador grande).
+ * - Si no hay texto bíblico, muestra el culto como la vieja pantalla de
+ *   proyección: tarjeta gigante de avisos, contador grande o guion, más los
+ *   mensajes del operador.
  */
 export default function PreacherView() {
-  const { state } = useShowChannel("stage");
+  const { state, peerOnline } = useShowChannel("stage");
 
   const [now, setNow] = useState(0);
   useEffect(() => {
@@ -61,7 +177,7 @@ export default function PreacherView() {
   }, []);
   const urlBiblia = urlConf ?? BIBLIA_URL_DEFECTO;
 
-  const { estado, mensaje, ocultar } = useBibliaSocket(urlBiblia);
+  const { estado, mensaje, ocultar, enviar } = useBibliaSocket(urlBiblia);
 
   const [confAbierta, setConfAbierta] = useState(false);
   const [inputUrl, setInputUrl] = useState(BIBLIA_URL_DEFECTO);
@@ -76,9 +192,9 @@ export default function PreacherView() {
     setUrlConf(limpia);
   };
 
-  const textoBibliaRef = useRef<HTMLDivElement | null>(null);
+  const textoCitaRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
-    if (textoBibliaRef.current) textoBibliaRef.current.scrollTop = 0;
+    if (textoCitaRef.current) textoCitaRef.current.scrollTop = 0;
   }, [mensaje]);
 
   const estadoBibliaLabel =
@@ -87,6 +203,38 @@ export default function PreacherView() {
       : estado === "conectando"
         ? "Biblia: conectando…"
         : "Biblia: sin conexión";
+
+  /* ─────────── Palabras del versículo + corte en partes ─────────── */
+
+  const palabrasVerso = useMemo<Palabra[] | null>(() => {
+    if (mensaje?.kind !== "verso") return null;
+    return (mensaje.verso.words || []).map((w) =>
+      typeof w === "string"
+        ? { t: w, h: "" }
+        : { t: String(w?.t ?? ""), h: String(w?.h ?? "") },
+    );
+  }, [mensaje]);
+
+  const [divisiones, setDivisiones] = useState<[number, number][]>([]);
+  const [parte, setParte] = useState(0);
+  const [medidaTick, setMedidaTick] = useState(0);
+  const medidorRef = useRef<HTMLDivElement | null>(null);
+
+  // Al cambiar el tamaño de la ventana (o al cargar las fuentes) se vuelve a medir
+  useEffect(() => {
+    const onResize = () => setMedidaTick((t) => t + 1);
+    window.addEventListener("resize", onResize);
+    let vivo = true;
+    document.fonts?.ready
+      ?.then(() => {
+        if (vivo) setMedidaTick((t) => t + 1);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+      window.removeEventListener("resize", onResize);
+    };
+  }, []);
 
   /* ─────────────────────────── Reloj del culto ─────────────────────────── */
 
@@ -98,7 +246,10 @@ export default function PreacherView() {
   const remaining = active ? totalMs - elapsed : 0;
   const overtimeMs = active ? Math.max(0, elapsed - totalMs) : 0;
   const phase = active ? phaseOf(remaining, state.settings.warningMin) : "idle";
+  const mode = seg?.layout ?? "timer";
+  const cardsOn = active && cardsActive(seg);
   const live = now > 0 && active;
+  const hayBarraTiempo = active && seg !== null;
 
   const counterText = live
     ? phase === "overtime"
@@ -120,6 +271,71 @@ export default function PreacherView() {
       : phase === "warning"
         ? "[&>div]:bg-amber-400"
         : "[&>div]:bg-white/80";
+
+  /* Mide y corta el versículo en partes de hasta 4 renglones (como la
+     proyección). Se recalcula cuando cambia el versículo, el tamaño de la
+     ventana o la barra de tiempo de abajo (que le quita altura al texto). */
+  useIsoLayoutEffect(() => {
+    const med = medidorRef.current;
+    if (!med || !palabrasVerso || palabrasVerso.length === 0) return;
+    // La caja visible del texto (el medidor la usa para saber si entra)
+    const caja = med.parentElement;
+    const mideOK = (r: [number, number]) => {
+      med.innerHTML = palabrasAHtml(palabrasVerso, r[0], r[1]);
+      const lh = parseFloat(getComputedStyle(med).lineHeight) || 10;
+      // El medidor tiene altura automática: scrollHeight = altura real del texto
+      const lineas = Math.round(med.scrollHeight / lh);
+      const entra = caja ? med.scrollHeight <= caja.clientHeight + 2 : true;
+      return lineas <= MAX_LINEAS && entra;
+    };
+    const medirYDividir = (): [number, number][] => {
+      if (mideOK([0, palabrasVerso.length])) return [[0, palabrasVerso.length]];
+      let ultimo: [number, number][] | null = null;
+      for (let N = 2; N <= 8; N++) {
+        const rangos = cortarEnN(palabrasVerso, N);
+        if (rangos.every((r) => mideOK(r))) return rangos;
+        ultimo = rangos;
+      }
+      return ultimo ?? [[0, palabrasVerso.length]];
+    };
+    setDivisiones(medirYDividir());
+    setParte(0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [palabrasVerso, medidaTick, hayBarraTiempo]);
+
+  const totalPartes = divisiones.length;
+  const siguienteParte = useCallback(() => {
+    setParte((p) => (totalPartes > 1 ? (p + 1) % totalPartes : 0));
+  }, [totalPartes]);
+  const anteriorParte = useCallback(() => {
+    setParte((p) => (totalPartes > 1 ? (p - 1 + totalPartes) % totalPartes : 0));
+  }, [totalPartes]);
+
+  /* Avisar al servidor cómo quedó cortado el versículo (el admin del teléfono
+     muestra "Parte X de Y" igual que con la pantalla de proyección). */
+  const versoActual = mensaje?.kind === "verso" ? mensaje.verso : null;
+  useEffect(() => {
+    if (!versoActual || divisiones.length === 0) return;
+    enviar({
+      type: "parts-info",
+      count: divisiones.length,
+      current: parte + 1,
+      ranges: divisiones,
+      verse: versoActual.verse,
+      chapter: versoActual.chapter,
+    });
+  }, [divisiones, parte, versoActual, enviar]);
+
+  const largo = palabrasVerso?.length ?? 0;
+  const rangoRaw = divisiones[parte] ?? [0, largo];
+  const rangoActual: [number, number] = [
+    Math.min(rangoRaw[0], largo),
+    Math.min(rangoRaw[1], largo),
+  ];
+  const parteHtml =
+    mensaje?.kind === "verso" && palabrasVerso
+      ? palabrasAHtml(palabrasVerso, rangoActual[0], rangoActual[1])
+      : "";
 
   const conBiblia = mensaje !== null;
 
@@ -153,13 +369,36 @@ export default function PreacherView() {
     }
   };
 
+  /* Teclado: F = pantalla completa; con biblia, ← → (o espacio) cambian de parte */
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.code === "KeyF") toggleFullscreen();
+      const t = e.target as HTMLElement | null;
+      if (
+        t &&
+        (t.tagName === "INPUT" ||
+          t.tagName === "TEXTAREA" ||
+          t.tagName === "SELECT" ||
+          t.isContentEditable)
+      ) {
+        return;
+      }
+      if (e.code === "KeyF") {
+        toggleFullscreen();
+        return;
+      }
+      if (mensaje?.kind !== "verso" || totalPartes <= 1) return;
+      if (e.code === "ArrowRight" || e.code === "Space" || e.code === "PageDown") {
+        e.preventDefault();
+        siguienteParte();
+      } else if (e.code === "ArrowLeft" || e.code === "PageUp") {
+        e.preventDefault();
+        anteriorParte();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [siguienteParte, anteriorParte, mensaje, totalPartes]);
 
   /* ────────────── Evitar que la pantalla entre en reposo ────────────── */
 
@@ -204,44 +443,60 @@ export default function PreacherView() {
             : "En vivo"
           : "En pausa";
 
-  /* ───────── Bloque compacto de tiempo (cuando hay Biblia arriba) ───────── */
+  /* Tarjeta grande: el tamaño de letra se adapta al largo del texto y a la
+     cantidad de renglones (igual que la vieja pantalla de proyección). */
+  function cardFontSize(text: string, lines: number): string {
+    const len = text.length;
+    const capLenW = len <= 40 ? "9vw" : len <= 90 ? "7.5vw" : len <= 160 ? "6vw" : len <= 260 ? "5vw" : "4vw";
+    const capLenH = len <= 40 ? "15vh" : len <= 90 ? "12vh" : len <= 160 ? "9.5vh" : len <= 260 ? "7.5vh" : "6vh";
+    const capLinesW = lines <= 1 ? "9vw" : lines <= 3 ? "6.5vw" : lines <= 5 ? "5vw" : lines <= 7 ? "4vw" : "3.2vw";
+    const capLinesH = lines <= 1 ? "15vh" : lines <= 3 ? "9.5vh" : lines <= 5 ? "7vh" : lines <= 7 ? "5.6vh" : "4.6vh";
+    return `min(${capLenW}, ${capLenH}, ${capLinesW}, ${capLinesH})`;
+  }
+
+  /* ───── Barra inferior: momento a la izquierda + tiempo grande a la derecha ───── */
 
   const bloqueTiempoCompacto =
     active && seg ? (
-      <div className="flex shrink-0 flex-col items-center pb-[2.6vh] text-center">
-        <div
-          key={seg.id}
-          className={cn(
-            "animate-card-in max-w-[90vw] truncate rounded-full border-2 px-[4vw] py-[1.3vh] font-black uppercase leading-none tracking-wide",
-            COLORS[seg.color].chipDark,
-          )}
-          style={{ fontSize: "min(3.8vw, 5.4vh)" }}
-        >
-          {seg.title}
+      <div className="shrink-0 px-[4vw] pb-[2vh]">
+        <div className="flex items-end justify-between gap-[2vw]">
+          {/* Izquierda: el momento actual, en la misma línea que el contador */}
+          <div className="flex min-w-0 items-center gap-[1.2vw] pb-[1.2vh]">
+            <div
+              key={seg.id}
+              className={cn(
+                "animate-card-in min-w-0 max-w-[40vw] truncate rounded-full border-2 px-[2.6vw] py-[0.9vh] font-black uppercase leading-none tracking-wide",
+                COLORS[seg.color].chipDark,
+              )}
+              style={{ fontSize: "min(3.2vw, 4.6vh)" }}
+            >
+              {seg.title}
+            </div>
+            {state.status === "paused" ? (
+              <div className="shrink-0 rounded-full bg-amber-400 px-[2vw] py-[0.6vh] text-[2.2vh] font-bold uppercase tracking-widest text-amber-950">
+                En pausa
+              </div>
+            ) : phase === "overtime" ? (
+              <div className="shrink-0 rounded-full bg-red-600 px-[2vw] py-[0.6vh] text-[2.2vh] font-bold uppercase tracking-widest text-white">
+                Tiempo cumplido
+              </div>
+            ) : null}
+          </div>
+
+          {/* Derecha: el tiempo grande */}
+          <div
+            className={cn(
+              "shrink-0 font-mono font-bold tabular-nums leading-none",
+              counterColor,
+              phase === "overtime" && state.settings.blink && "animate-blink-soft",
+            )}
+            style={{ fontSize: "min(14vw, 19vh)" }}
+          >
+            {counterText}
+          </div>
         </div>
 
-        {state.status === "paused" ? (
-          <div className="mt-[1.2vh] rounded-full bg-amber-400 px-[2.8vw] py-[0.8vh] text-[2.6vh] font-bold uppercase tracking-widest text-amber-950">
-            En pausa
-          </div>
-        ) : phase === "overtime" ? (
-          <div className="mt-[1.2vh] rounded-full bg-red-600 px-[2.8vw] py-[0.8vh] text-[2.6vh] font-bold uppercase tracking-widest text-white">
-            Tiempo cumplido
-          </div>
-        ) : null}
-
-        <div
-          className={cn(
-            "mt-[0.8vh] font-mono font-bold tabular-nums leading-none",
-            counterColor,
-            phase === "overtime" && state.settings.blink && "animate-blink-soft",
-          )}
-          style={{ fontSize: "min(14vw, 19vh)" }}
-        >
-          {counterText}
-        </div>
-
-        <div className="mt-[1.4vh] w-[56vw] max-w-[1000px]">
+        <div className="mt-[1.2vh] w-full">
           <Progress
             value={progressValue}
             className={cn("h-[1.1vh] bg-white/10", progressClass)}
@@ -270,34 +525,62 @@ export default function PreacherView() {
 
       {mensaje.kind === "verso" ? (
         <>
-          <div
-            key={`${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}`}
-            className="animate-card-in shrink-0 font-bold uppercase tracking-[0.12em] text-amber-300"
-            style={{ fontSize: "min(4.6vw, 6.2vh)" }}
-          >
-            {referenciaDelVerso(mensaje.verso)}
-            {mensaje.verso.version ? (
-              <span className="ml-[1.2vw] font-semibold tracking-normal text-amber-200/70">
-                · {abreviarVersion(mensaje.verso.version)}
-              </span>
+          {/* Referencia + badge de parte (a la derecha, sin pisar la ✕) */}
+          <div className="flex shrink-0 items-end justify-between gap-3 pr-[calc(1.5vw+56px)]">
+            <div
+              key={`${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}`}
+              className="animate-card-in min-w-0 truncate font-bold uppercase tracking-[0.12em] text-amber-300"
+              style={{ fontSize: "min(4.6vw, 6.2vh)" }}
+            >
+              {referenciaDelVerso(mensaje.verso)}
+              {mensaje.verso.version ? (
+                <span className="ml-[1.2vw] font-semibold tracking-normal text-amber-200/70">
+                  · {abreviarVersion(mensaje.verso.version)}
+                </span>
+              ) : null}
+            </div>
+            {totalPartes > 1 ? (
+              <button
+                type="button"
+                onClick={siguienteParte}
+                title="Siguiente parte (también con la tecla →)"
+                className="animate-card-in shrink-0 rounded-full border border-amber-300/40 bg-amber-300/10 px-[1.8vw] py-[0.6vh] font-bold uppercase tracking-widest text-amber-200"
+                style={{ fontSize: "min(1.9vw, 2.6vh)" }}
+              >
+                Parte {parte + 1} de {totalPartes} ▶
+              </button>
             ) : null}
           </div>
-          <div
-            ref={textoBibliaRef}
-            key={`t-${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}`}
-            className="animate-card-in mt-[1.6vh] min-h-0 flex-1 overflow-y-auto font-semibold leading-[1.28] text-white"
-            style={{ fontSize: "min(6.2vw, 8.6vh)" }}
-          >
-            {textoDelVerso(mensaje.verso)}
+
+          {/* Texto de la parte actual (tocar = siguiente parte) + medidor oculto */}
+          <div className="relative mt-[1.6vh] min-h-0 flex-1">
+            <div
+              key={`t-${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}-${parte}`}
+              onClick={siguienteParte}
+              className="animate-card-in absolute inset-0 cursor-pointer overflow-hidden font-semibold leading-[1.28] text-white"
+              style={{ fontSize: "min(6.2vw, 8.6vh)" }}
+              dangerouslySetInnerHTML={{ __html: parteHtml }}
+            />
+            <div
+              ref={medidorRef}
+              aria-hidden="true"
+              className="absolute inset-x-0 top-0 font-semibold leading-[1.28]"
+              style={{ fontSize: "min(6.2vw, 8.6vh)", visibility: "hidden" }}
+            />
           </div>
         </>
       ) : (
         <>
-          <div className="animate-card-in shrink-0 font-bold uppercase tracking-[0.12em] text-amber-300" style={{ fontSize: "min(4.6vw, 6.2vh)" }}>
-            Cita
+          <div className="flex shrink-0 items-end justify-between gap-3 pr-[calc(1.5vw+56px)]">
+            <div
+              className="animate-card-in font-bold uppercase tracking-[0.12em] text-amber-300"
+              style={{ fontSize: "min(4.6vw, 6.2vh)" }}
+            >
+              Cita
+            </div>
           </div>
           <div
-            ref={textoBibliaRef}
+            ref={textoCitaRef}
             className="animate-card-in mt-[1.6vh] min-h-0 flex-1 overflow-y-auto font-semibold leading-[1.28] text-white [&_em]:text-amber-200 [&_strong]:text-amber-200"
             style={{ fontSize: "min(6.2vw, 8.6vh)" }}
             dangerouslySetInnerHTML={{ __html: mensaje.html }}
@@ -315,10 +598,7 @@ export default function PreacherView() {
       )}
     >
       {/* Barra superior discreta */}
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-[2.5vw] py-[1.6vh] text-[1.8vh] text-zinc-500">
-        <span className="font-medium uppercase tracking-[0.3em]">
-          {state.serviceTitle}
-        </span>
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-end px-[2.5vw] py-[1.6vh] text-[1.8vh] text-zinc-500">
         <span className="flex items-center gap-3">
           <span className="font-mono text-zinc-600">{VERSION_APP}</span>
           <span className="flex items-center gap-1.5" title={estadoBibliaLabel}>
@@ -368,13 +648,18 @@ export default function PreacherView() {
         </div>
       ) : (
         <>
+          {/* Pista: el panel no está abierto (solo donde no estorba) */}
+          {!peerOnline && (!active || mode === "timer") ? (
+            <div className="absolute bottom-[2.5vh] left-[2vw] z-30 max-w-[30vw] text-[1.6vh] leading-snug text-zinc-600">
+              Abrí el Panel de control en otra ventana de este navegador para
+              manejar el cronómetro.
+            </div>
+          ) : null}
+
           {/* ── Culto sin iniciar ── */}
           {!active && state.status !== "finished" ? (
             <div className="absolute inset-0 flex flex-col items-center justify-center px-[6vw] text-center">
-              <div className="text-[2.2vh] uppercase tracking-[0.4em] text-zinc-500">
-                {state.serviceTitle}
-              </div>
-              <div className="mt-[2.5vh] text-[6.5vh] font-bold leading-tight">
+              <div className="text-[6.5vh] font-bold leading-tight">
                 El culto comienza pronto
               </div>
               {first ? (
@@ -396,49 +681,117 @@ export default function PreacherView() {
             </div>
           ) : null}
 
-          {/* ── Pastilla grande del momento + tiempo grande abajo ── */}
-          {active && seg ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center px-[4vw] pb-[5vh] text-center">
-              {/* Pastilla grande */}
-              <div
-                key={seg.id}
-                className={cn(
-                  "animate-card-in max-w-[92vw] rounded-full border-2 px-[5vw] py-[2.6vh] font-black uppercase leading-none tracking-wide",
-                  "truncate",
-                  COLORS[seg.color].chipDark,
-                )}
-                style={{ fontSize: "min(6.2vw, 8.5vh)" }}
-              >
-                {seg.title}
+          {/* ── Momento con su tarjeta grande: UNA sola, con todos los puntos ── */}
+          {active && cardsOn && seg ? (
+            <div className="absolute inset-0 flex flex-col">
+              {/* Encabezado */}
+              <div className="flex items-center justify-between gap-4 px-[4vw] pt-[6.5vh]">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={cn(
+                      "h-[1.8vh] w-[1.8vh] shrink-0 rounded-full",
+                      COLORS[seg.color].dot,
+                    )}
+                  />
+                  <div className="truncate text-[3vh] font-bold">{seg.title}</div>
+                  {state.status === "paused" ? (
+                    <span className="shrink-0 rounded-full bg-amber-400 px-[1.4vw] py-[0.5vh] text-[1.8vh] font-bold uppercase tracking-widest text-amber-950">
+                      En pausa
+                    </span>
+                  ) : null}
+                </div>
+                <div className="shrink-0 text-[2.2vh] font-bold tabular-nums text-zinc-400">
+                  {seg.bullets.length} {seg.bullets.length === 1 ? "punto" : "puntos"}
+                </div>
               </div>
 
+              {/* Tarjeta: todos los puntos juntos, con letra gigante */}
+              <div className="flex min-h-0 flex-1 items-center justify-center px-[5vw]">
+                <div
+                  key={seg.id}
+                  className="animate-card-in max-w-[90vw] text-center font-bold leading-[1.3] text-balance text-white"
+                  style={{ fontSize: cardFontSize(seg.bullets.join(" "), seg.bullets.length) }}
+                >
+                  {seg.bullets.map((b, i) => (
+                    <div key={i} className="py-[0.9vh]">
+                      {b}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Contador abajo */}
+              <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-[4vw] py-[1.8vh]">
+                <div className="flex items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-[1.7vh] uppercase tracking-[0.25em] text-zinc-500">
+                      Tiempo del momento
+                    </div>
+                    <div
+                      className={cn(
+                        "font-mono font-bold tabular-nums leading-none",
+                        counterColor,
+                        phase === "overtime" && state.settings.blink && "animate-blink-soft",
+                      )}
+                      style={{ fontSize: "min(8vw, 11vh)" }}
+                    >
+                      {counterText}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right text-[2vh] leading-relaxed text-zinc-500">
+                    <div>{seg.minutes} min planificados</div>
+                    <div>
+                      {next ? (
+                        <>
+                          Siguiente: <b className="text-zinc-300">{next.title}</b> ·{" "}
+                          {next.minutes} min
+                        </>
+                      ) : (
+                        "Último momento"
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Progress
+                  value={progressValue}
+                  className={cn("mt-[1.2vh] h-[0.8vh] bg-white/10", progressClass)}
+                />
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── Momento en modo contador grande ── */}
+          {active && !cardsOn && mode === "timer" && seg ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center px-[4vw] pb-[6vh] text-center">
+              <div className="text-[3.4vh] font-bold tracking-wide text-zinc-200">
+                {seg.title}
+              </div>
               {seg.speaker ? (
-                <div className="mt-[1.6vh] text-[2.2vh] text-zinc-500">{seg.speaker}</div>
+                <div className="mt-[0.8vh] text-[2.2vh] text-zinc-500">{seg.speaker}</div>
               ) : null}
 
               {state.status === "paused" ? (
-                <div className="mt-[2.4vh] rounded-full bg-amber-400 px-[3vw] py-[0.9vh] text-[2.3vh] font-bold uppercase tracking-widest text-amber-950">
+                <div className="mt-[3vh] rounded-full bg-amber-400 px-[3vw] py-[1vh] text-[2.4vh] font-bold uppercase tracking-widest text-amber-950">
                   En pausa
                 </div>
               ) : phase === "overtime" ? (
-                <div className="mt-[2.4vh] rounded-full bg-red-600 px-[3vw] py-[0.9vh] text-[2.3vh] font-bold uppercase tracking-widest text-white">
+                <div className="mt-[3vh] rounded-full bg-red-600 px-[3vw] py-[1vh] text-[2.4vh] font-bold uppercase tracking-widest text-white">
                   Tiempo cumplido
                 </div>
               ) : null}
 
-              {/* El tiempo, abajo de la pastilla */}
               <div
                 className={cn(
-                  "mt-[1.2vh] font-mono font-bold tabular-nums leading-none",
+                  "mt-[1.5vh] font-mono font-bold tabular-nums leading-none",
                   counterColor,
                   phase === "overtime" && state.settings.blink && "animate-blink-soft",
                 )}
-                style={{ fontSize: "min(22vw, 29vh)" }}
+                style={{ fontSize: "min(23vw, 30vh)" }}
               >
                 {counterText}
               </div>
 
-              <div className="mt-[1.8vh] text-[2.2vh] text-zinc-500">
+              <div className="mt-[2vh] text-[2.4vh] text-zinc-500">
                 {phase === "overtime"
                   ? `Excedente · planificado ${seg.minutes} min`
                   : phase === "warning"
@@ -446,26 +799,166 @@ export default function PreacherView() {
                     : `${seg.minutes} min planificados`}
               </div>
 
-              <div className="mt-[3.5vh] w-[58vw] max-w-[1000px]">
-                <Progress
-                  value={progressValue}
-                  className={cn("h-[1.1vh] bg-white/10", progressClass)}
-                />
+              <div className="mt-[4vh] w-[64vw] max-w-[1100px]">
+                <Progress value={progressValue} className={cn("h-[1.2vh] bg-white/10", progressClass)} />
               </div>
 
-              <div className="mt-[2.6vh] text-[2vh] text-zinc-500">
-                {next ? (
-                  <>
-                    Siguiente: <b className="text-zinc-300">{next.title}</b> · {next.minutes} min
-                  </>
+              {state.settings.showBulletsOnTimer && seg.bullets.length > 0 ? (
+                <div className="absolute bottom-[3.5vh] left-[4vw] right-[4vw] flex flex-wrap items-center justify-center gap-2">
+                  {seg.bullets.map((b, i) => (
+                    <span
+                      key={i}
+                      className={cn(
+                        "max-w-[46vw] truncate rounded-full border px-[1.6vw] py-[0.8vh] text-[2.1vh]",
+                        COLORS[seg.color].chipDark,
+                      )}
+                      title={b}
+                    >
+                      {b}
+                    </span>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+
+          {/* ── Momento en modo guion + contador abajo ── */}
+          {active && !cardsOn && mode === "script" && seg ? (
+            <div className="absolute inset-0 flex flex-col">
+              <div className="px-[4vw] pt-[6.5vh]">
+                <div className="flex items-center gap-3">
+                  <span
+                    className={cn(
+                      "h-[1.8vh] w-[1.8vh] rounded-full",
+                      COLORS[seg.color].dot,
+                    )}
+                  />
+                  <div className="text-[3vh] font-bold">{seg.title}</div>
+                  {state.status === "paused" ? (
+                    <span className="rounded-full bg-amber-400 px-[1.4vw] py-[0.5vh] text-[1.8vh] font-bold uppercase tracking-widest text-amber-950">
+                      En pausa
+                    </span>
+                  ) : null}
+                </div>
+                {seg.bullets.length > 0 ? (
+                  <div className="mt-[1.4vh] flex flex-wrap gap-2">
+                    {seg.bullets.map((b, i) => (
+                      <span
+                        key={i}
+                        className={cn(
+                          "rounded-full border px-[1.4vw] py-[0.7vh] text-[2.1vh] font-medium",
+                          COLORS[seg.color].chipDark,
+                        )}
+                      >
+                        {b}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="scrollbar-none mt-[1.5vh] flex-1 overflow-y-auto px-[4vw] pb-[4vh]">
+                {seg.script.trim() ? (
+                  seg.script.split("\n").map((line, i) =>
+                    line.trim() ? (
+                      <p
+                        key={i}
+                        className="mb-[3.2vh] font-medium text-zinc-100"
+                        style={{ fontSize: "min(3.2vw, 4.6vh)", lineHeight: 1.4 }}
+                      >
+                        {line}
+                      </p>
+                    ) : (
+                      <div key={i} className="h-[1.5vh]" />
+                    ),
+                  )
+                ) : seg.bullets.length > 0 ? (
+                  <div className="py-[3vh]">
+                    {seg.bullets.map((b, i) => (
+                      <p
+                        key={i}
+                        className="mb-[4vh] font-bold text-zinc-100"
+                        style={{ fontSize: "min(3.8vw, 5.4vh)", lineHeight: 1.35 }}
+                      >
+                        {i + 1}. {b}
+                      </p>
+                    ))}
+                  </div>
                 ) : (
-                  "Último momento del culto"
+                  <p className="py-[8vh] text-center text-[2.4vh] text-zinc-600">
+                    El guion de este momento está vacío. Escribilo desde el panel de control.
+                  </p>
                 )}
+              </div>
+
+              <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-[4vw] py-[1.8vh]">
+                <div className="flex items-end justify-between gap-4">
+                  <div className="min-w-0">
+                    <div className="text-[1.7vh] uppercase tracking-[0.25em] text-zinc-500">
+                      Tiempo del momento
+                    </div>
+                    <div
+                      className={cn(
+                        "font-mono font-bold tabular-nums leading-none",
+                        counterColor,
+                        phase === "overtime" && state.settings.blink && "animate-blink-soft",
+                      )}
+                      style={{ fontSize: "min(8vw, 11vh)" }}
+                    >
+                      {counterText}
+                    </div>
+                  </div>
+                  <div className="shrink-0 text-right text-[2vh] leading-relaxed text-zinc-500">
+                    <div>{seg.minutes} min planificados</div>
+                    <div>
+                      {next ? (
+                        <>
+                          Siguiente: <b className="text-zinc-300">{next.title}</b> ·{" "}
+                          {next.minutes} min
+                        </>
+                      ) : (
+                        "Último momento"
+                      )}
+                    </div>
+                  </div>
+                </div>
+                <Progress
+                  value={progressValue}
+                  className={cn("mt-[1.2vh] h-[0.8vh] bg-white/10", progressClass)}
+                />
               </div>
             </div>
           ) : null}
         </>
       )}
+
+      {/* ── Mensaje del operador (se ve en esta pantalla, como antes) ── */}
+      {state.message ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-[5vw]">
+          <div
+            className={cn(
+              "animate-pulse-border w-full rounded-[3rem] px-[4vw] py-[5vh] text-center shadow-2xl",
+              state.message.urgent ? "bg-red-600 text-white" : "bg-amber-400 text-zinc-950",
+            )}
+          >
+            <div
+              className={cn(
+                "flex items-center justify-center gap-2 text-[1.9vh] font-bold uppercase tracking-[0.3em]",
+                state.message.urgent ? "text-white/80" : "text-zinc-700",
+              )}
+            >
+              <MessageSquare className="h-[2.2vh] w-[2.2vh]" aria-hidden="true" />
+              Mensaje del operador
+            </div>
+            <div
+              className="mt-[2.5vh] font-black leading-tight"
+              style={{ fontSize: "min(6.5vw, 9vh)" }}
+            >
+              {state.message.text}
+            </div>
+          </div>
+        </div>
+      ) : null}
 
       {/* ── Configuración de Biblia Sincronizada ── */}
       <div
@@ -512,8 +1005,9 @@ export default function PreacherView() {
           </div>
           <p className="text-[11px] leading-snug text-zinc-500">
             Los versículos que elijas en <b>admin.html</b> de Biblia Sincronizada
-            aparecen acá en vivo, con el contador abajo. La primera conexión puede
-            demorar un minuto si el servidor estaba dormido.
+            aparecen acá en vivo, cortados en partes de 4 renglones (igual que la
+            proyección). Tocá el texto o usá ← → para cambiar de parte. La primera
+            conexión puede demorar un minuto si el servidor estaba dormido.
           </p>
         </div>
       </div>
