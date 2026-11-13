@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   Check,
@@ -57,6 +57,8 @@ import { cn } from "@/lib/utils";
 import {
   advance,
   back,
+  BibliaDisplay,
+  cardsActive,
   COLORS,
   COLOR_KEYS,
   ColorKey,
@@ -74,6 +76,7 @@ import {
   resetService,
   Segment,
   Settings,
+  ShowState,
   start,
   uid,
   useNow,
@@ -81,15 +84,8 @@ import {
 } from "@/lib/show";
 import { VERSION_APP } from "@/lib/version";
 
-const QUICK_MESSAGES = [
-  "Cerrá en 2 minutos",
-  "Último punto",
-  "Vamos a la ofrenda",
-  "Cerrá con oración",
-];
-
 export default function PanelView() {
-  const { state, mutate, peerOnline } = useShowChannel("panel");
+  const { state, mutate, peerOnline, bibliaProyectada } = useShowChannel("panel");
   const now = useNow(500);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [msgDraft, setMsgDraft] = useState("");
@@ -298,6 +294,16 @@ export default function PanelView() {
   );
 
   const editingSeg = state.segments.find((x) => x.id === editingId) ?? null;
+
+  /* Espejo de la letra bíblica que proyecta la pantalla del predicador.
+     La pantalla del predicador lo publica por el canal; se considera
+     válido si llegó hace menos de 10 segundos (si esa ventana se cerró,
+     la mini pantalla vuelve al culto solo). */
+  const bibliaViva = useMemo(() => {
+    if (!bibliaProyectada) return null;
+    if (now > 0 && Date.now() - bibliaProyectada.ts > 10000) return null;
+    return bibliaProyectada;
+  }, [bibliaProyectada, now]);
 
   const counterColor =
     phase === "overtime"
@@ -769,476 +775,4 @@ export default function PanelView() {
                   <span className="text-xs text-muted-foreground">Último momento</span>
                 ) : (
                   upcoming.map(({ x, i }) => (
-                    <Badge key={x.id} variant="outline" className="gap-1.5 font-normal">
-                      <span
-                        className={cn("h-2 w-2 rounded-full", COLORS[x.color].dot)}
-                        aria-hidden="true"
-                      />
-                      {i + 1}. {x.title} · {x.minutes} min
-                    </Badge>
-                  ))
-                )}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Columna derecha */}
-        <div className="space-y-4">
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <MessageSquare className="h-4 w-4" aria-hidden="true" /> Mensajes al orador
-              </CardTitle>
-              <CardDescription>Aparecen grandes en la pantalla del predicador</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="flex flex-wrap gap-1.5">
-                {QUICK_MESSAGES.map((q) => (
-                  <Button
-                    key={q}
-                    size="sm"
-                    variant="secondary"
-                    className="h-8"
-                    onClick={() => sendMessage(q, false)}
-                  >
-                    {q}
-                  </Button>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <Input
-                  aria-label="Mensaje personalizado"
-                  placeholder="Escribir mensaje…"
-                  value={msgDraft}
-                  onChange={(e) => setMsgDraft(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") {
-                      sendMessage(msgDraft, msgUrgent);
-                      setMsgDraft("");
-                    }
-                  }}
-                />
-                <Button
-                  size="icon"
-                  aria-label="Enviar mensaje"
-                  className="h-10 w-10 shrink-0"
-                  onClick={() => {
-                    sendMessage(msgDraft, msgUrgent);
-                    setMsgDraft("");
-                  }}
-                >
-                  <Send className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              </div>
-              <div className="flex items-center gap-2">
-                <Switch
-                  id="msg-urgent"
-                  checked={msgUrgent}
-                  onCheckedChange={setMsgUrgent}
-                />
-                <Label htmlFor="msg-urgent" className="text-sm font-normal">
-                  Urgente (rojo, para llamar la atención)
-                </Label>
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0 text-xs text-muted-foreground">
-                  {state.message ? (
-                    <span className="line-clamp-2">
-                      En pantalla: <b>“{state.message.text}”</b>
-                    </span>
-                  ) : (
-                    "Sin mensaje en pantalla"
-                  )}
-                </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="h-8 shrink-0"
-                  disabled={!state.message}
-                  onClick={() => mutate((p) => ({ ...p, message: null }))}
-                >
-                  <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpiar
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base">Ajustes de la pantalla</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="warning-min" className="text-sm font-normal">
-                  Aviso amarillo
-                </Label>
-                <Select
-                  value={String(state.settings.warningMin)}
-                  onValueChange={(v) => setSettings({ warningMin: Number(v) })}
-                >
-                  <SelectTrigger id="warning-min" className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">Sin aviso</SelectItem>
-                    <SelectItem value="1">1 min antes</SelectItem>
-                    <SelectItem value="2">2 min antes</SelectItem>
-                    <SelectItem value="3">3 min antes</SelectItem>
-                    <SelectItem value="5">5 min antes</SelectItem>
-                    <SelectItem value="10">10 min antes</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="set-blink" className="text-sm font-normal">
-                  Parpadear cuando el tiempo está cumplido
-                </Label>
-                <Switch
-                  id="set-blink"
-                  checked={state.settings.blink}
-                  onCheckedChange={(v) => setSettings({ blink: v })}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="set-auto" className="text-sm font-normal">
-                  Auto-iniciar el siguiente momento
-                </Label>
-                <Switch
-                  id="set-auto"
-                  checked={state.settings.autoAdvance}
-                  onCheckedChange={(v) => setSettings({ autoAdvance: v })}
-                />
-              </div>
-              <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="set-bullets" className="text-sm font-normal">
-                  Mostrar puntos clave en modo contador
-                </Label>
-                <Switch
-                  id="set-bullets"
-                  checked={state.settings.showBulletsOnTimer}
-                  onCheckedChange={(v) => setSettings({ showBulletsOnTimer: v })}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Cada momento puede mostrarse en modo “Contador grande” o “Guion + contador
-                abajo” (se cambia en la edición del momento).
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-        </div>
-      </main>
-
-      {/* Editor de momento (modal) */}
-      <Dialog
-        open={!!editingSeg}
-        onOpenChange={(o) => {
-          if (!o) setEditingId(null);
-        }}
-      >
-        <DialogContent className="max-h-[85vh] max-w-lg overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Editar momento</DialogTitle>
-            <DialogDescription>
-              Los cambios se ven al instante en la pantalla del predicador.
-            </DialogDescription>
-          </DialogHeader>
-          {editingSeg ? (
-            <SegmentEditor
-              seg={editingSeg}
-              canDelete={state.segments.length > 1}
-              onUpdate={(patch) => updateSegment(editingSeg.id, patch)}
-              onDelete={() => {
-                removeSegment(editingSeg.id);
-                setEditingId(null);
-              }}
-              onJump={() => {
-                const idx = state.segments.findIndex((s) => s.id === editingSeg.id);
-                if (idx >= 0) mutate((p) => jumpTo(p, idx));
-                setEditingId(null);
-              }}
-            />
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-    </div>
-  );
-}
-
-/* ─────────────────────── Editor de momento ─────────────────────── */
-
-function SegmentEditor({
-  seg,
-  onUpdate,
-  onDelete,
-  onJump,
-  canDelete,
-}: {
-  seg: Segment;
-  onUpdate: (patch: Partial<Segment>) => void;
-  onDelete: () => void;
-  onJump: () => void;
-  canDelete: boolean;
-}) {
-  const [bulletDraft, setBulletDraft] = useState("");
-  const [confirmDelete, setConfirmDelete] = useState(false);
-
-  const addBullet = () => {
-    const t = bulletDraft.trim();
-    if (!t) return;
-    onUpdate({ bullets: [...seg.bullets, t] });
-    setBulletDraft("");
-  };
-
-  return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-2">
-        <div className="col-span-2 space-y-1">
-          <Label htmlFor={`t-${seg.id}`} className="text-xs">
-            Título
-          </Label>
-          <Input
-            id={`t-${seg.id}`}
-            value={seg.title}
-            onChange={(e) => onUpdate({ title: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`s-${seg.id}`} className="text-xs">
-            Orador
-          </Label>
-          <Input
-            id={`s-${seg.id}`}
-            value={seg.speaker}
-            placeholder="Ej.: Anunciador"
-            onChange={(e) => onUpdate({ speaker: e.target.value })}
-          />
-        </div>
-        <div className="space-y-1">
-          <Label htmlFor={`m-${seg.id}`} className="text-xs">
-            Duración (min)
-          </Label>
-          <Input
-            id={`m-${seg.id}`}
-            type="number"
-            min={1}
-            max={600}
-            value={seg.minutes}
-            onChange={(e) => {
-              const v = Number(e.target.value);
-              if (Number.isFinite(v)) onUpdate({ minutes: Math.min(600, Math.max(1, Math.round(v))) });
-            }}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label className="text-xs">Cómo se muestra en la pantalla</Label>
-        <Select
-          value={seg.layout}
-          onValueChange={(v) => onUpdate({ layout: v === "script" ? "script" : "timer" })}
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="timer">Contador grande</SelectItem>
-            <SelectItem value="script">Guion + contador abajo</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5">
-        <div className="min-w-0">
-          <Label htmlFor={`c-${seg.id}`} className="text-xs font-medium">
-            Tarjeta grande en pantalla
-          </Label>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-            Muestra todos los puntos juntos en una sola tarjeta, con letra grande
-            (ideal para los anuncios; anula el guion y el contador grande).
-          </p>
-        </div>
-        <Switch
-          id={`c-${seg.id}`}
-          checked={seg.cards}
-          onCheckedChange={(v) => onUpdate({ cards: v })}
-          className="mt-0.5 shrink-0"
-        />
-      </div>
-
-      <div className="space-y-1.5">
-        <Label className="text-xs">
-          {seg.cards ? "Puntos de la tarjeta" : "Puntos clave"}
-        </Label>
-        {seg.bullets.map((b, i) => (
-        <div key={i} className="flex gap-1.5">
-            {seg.cards ? (
-              <Textarea
-                value={b}
-                rows={2}
-                aria-label={`Punto ${i + 1}`}
-                onChange={(e) => {
-                  const arr = [...seg.bullets];
-                  arr[i] = e.target.value;
-                  onUpdate({ bullets: arr });
-                }}
-              />
-            ) : (
-              <Input
-                value={b}
-                aria-label={`Punto ${i + 1}`}
-                onChange={(e) => {
-                  const arr = [...seg.bullets];
-                  arr[i] = e.target.value;
-                  onUpdate({ bullets: arr });
-                }}
-              />
-            )}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-10 w-9 shrink-0 self-start"
-              aria-label={`Quitar punto ${i + 1}`}
-              onClick={() => onUpdate({ bullets: seg.bullets.filter((_, j) => j !== i) })}
-            >
-              <X className="h-4 w-4" aria-hidden="true" />
-            </Button>
-          </div>
-        ))}
-        <div className="flex gap-1.5">
-          <Input
-            value={bulletDraft}
-            placeholder="Agregar punto…"
-            aria-label="Nuevo punto clave"
-            onChange={(e) => setBulletDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") addBullet();
-            }}
-          />
-          <Button
-            size="icon"
-            variant="outline"
-            className="h-10 w-9 shrink-0"
-            aria-label="Agregar punto"
-            onClick={addBullet}
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-          </Button>
-        </div>
-      </div>
-
-      <div className="space-y-1">
-        <Label className="text-xs">
-          Guion extendido (se muestra en la pantalla del predicador)
-          {seg.cards ? " — queda anulado mientras la tarjeta esté activa" : ""}
-        </Label>
-        <Textarea
-          value={seg.script}
-          rows={4}
-          placeholder="Texto más largo que se muestra en la pantalla del predicador…"
-          onChange={(e) => onUpdate({ script: e.target.value })}
-        />
-      </div>
-
-      <div className="flex items-center justify-between gap-2 pt-1">
-        <Button size="sm" variant="secondary" onClick={onJump}>
-          <SkipForward className="h-3.5 w-3.5" aria-hidden="true" /> Ir a este momento
-        </Button>
-        {canDelete ? (
-          confirmDelete ? (
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => {
-                onDelete();
-                setConfirmDelete(false);
-              }}
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Confirmar
-            </Button>
-          ) : (
-            <Button
-              size="sm"
-              variant="ghost"
-              className="text-red-600 hover:text-red-600"
-              onClick={() => setConfirmDelete(true)}
-            >
-              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar
-            </Button>
-          )
-        ) : null}
-      </div>
-    </div>
-  );
-}
-
-/* ────────────────────────── Ayuda ─────────────────────────────── */
-
-function HelpDialog() {
-  return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button size="icon" variant="ghost" aria-label="Ayuda de uso">
-          <HelpCircle className="h-4 w-4" aria-hidden="true" />
-        </Button>
-      </DialogTrigger>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Cómo usar con el proyector</DialogTitle>
-          <DialogDescription>
-            Sistema de control de tiempos para el culto: contador, tarjetas y mensajes
-            al orador.
-          </DialogDescription>
-        </DialogHeader>
-        <ol className="list-decimal space-y-2.5 pl-5 text-sm">
-          <li>
-            Tocá <b>“Abrir pantalla del predicador”</b>: es la única pantalla — hace
-            de proyección y de pantalla del predicador a la vez. Con un solo monitor,
-            abrí esa y listo: muestra el contador, las tarjetas de avisos, la letra
-            bíblica y los mensajes.
-          </li>
-          <li>
-            Ponela en pantalla completa con el botón de la esquina (o con <b>F11</b>)
-            y proyectala al monitor o TV de la iglesia.
-          </li>
-          <li>
-            Volvé a esta ventana y manejá el culto desde la <b>secuencia horizontal</b>{" "}
-            de arriba: tocá un momento para saltar a él, y editá cada uno con el{" "}
-            <b>lápiz</b>. Mensajes al orador en la columna de la derecha.
-          </li>
-        </ol>
-        <Separator />
-        <div className="rounded-lg border bg-muted/40 p-3 text-sm">
-          <b>Avisos en una sola tarjeta:</b> en la sección <b>“Ahora”</b> activá el
-          interruptor <b>Tarjetas</b> y escribí los puntos ahí mismo: todos se ven
-          juntos en <b>una sola tarjeta gigante</b> en la pantalla del predicador, y los
-          vas editando en vivo. Los avisos de un momento futuro se preparan con el
-          lápiz de ese momento en la secuencia.
-        </div>
-        <Separator />
-        <ul className="space-y-1.5 text-xs text-muted-foreground">
-          <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
-          <li>
-            · Los versículos de <b>Biblia Sincronizada</b> (elegidos en su{" "}
-            <b>admin.html</b>) aparecen en vivo con el contador abajo, cortados en
-            partes de 4 renglones igual que la proyección: tocá el texto o usá ← →
-            para cambiar de parte. El servidor se cambia con el engranaje de esa
-            pantalla.
-          </li>
-          <li>
-            · Los mensajes del operador también salen en esta pantalla, encima de
-            todo lo demás.
-          </li>
-          <li>
-            · El contador pasa de blanco a amarillo en los minutos finales y a rojo
-            cuando se cumple el tiempo.
-          </li>
-          <li>· Los datos quedan guardados en este navegador.</li>
-        </ul>
-      </DialogContent>
-    </Dialog>
-  );
-}
+                    <Badge key={x.id} variant="outline" className="gap-1.5 font-norma
