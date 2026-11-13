@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 /**
  * Conexión con "Biblia Sincronizada" (misma cuenta de GitHub del usuario).
@@ -149,10 +149,25 @@ export function useBibliaSocket(url: string): {
   mensaje: MensajeBiblia;
   ocultar: () => void;
   reintentar: () => void;
+  /** Envia un dato al servidor (se difunde a todos: admin, proyecciones…).
+   * La pantalla del predicador lo usa para avisar cómo cortó el versículo
+   * en partes, igual que hacía proyeccion.html. */
+  enviar: (data: unknown) => void;
 } {
   const [estado, setEstado] = useState<EstadoBiblia>("conectando");
   const [mensaje, setMensaje] = useState<MensajeBiblia>(null);
   const [nonce, setNonce] = useState(0);
+  const wsRef = useRef<WebSocket | null>(null);
+
+  const enviar = useCallback((data: unknown) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    try {
+      ws.send(JSON.stringify({ type: "project", reference: "", data }));
+    } catch {
+      /* canal no disponible */
+    }
+  }, []);
 
   // Al cambiar la URL: nueva conexión y se limpia lo mostrado
   useEffect(() => {
@@ -173,6 +188,7 @@ export function useBibliaSocket(url: string): {
       try {
         const u = url.replace(/^http/, "ws").replace(/\/+$/, "");
         ws = new WebSocket(u);
+        wsRef.current = ws;
       } catch {
         setEstado("desconectado");
         reintro = window.setTimeout(conectar, 3000);
@@ -223,6 +239,7 @@ export function useBibliaSocket(url: string): {
     return () => {
       cerrado = true;
       if (reintro) window.clearTimeout(reintro);
+      if (wsRef.current === ws) wsRef.current = null;
       try {
         ws?.close();
       } catch {
@@ -240,5 +257,5 @@ export function useBibliaSocket(url: string): {
     setNonce((n) => n + 1);
   };
 
-  return { estado, mensaje, ocultar, reintentar };
+  return { estado, mensaje, ocultar, reintentar, enviar };
 }
