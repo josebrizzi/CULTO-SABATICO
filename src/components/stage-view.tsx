@@ -33,14 +33,18 @@ export default function StageView() {
     time: 0,
     dur: null,
     id: null,
-      /** El himno proyectado no tiene su MP3 guardado en ESTE navegador. */
-  const [mp3Falta, setMp3Falta] = useState(false);
   });
+  /** El himno proyectado no tiene su MP3 guardado en ESTE navegador. */
+  const [mp3Falta, setMp3Falta] = useState(false);
 
   const cargarAudio = async (himnoId: string): Promise<boolean> => {
     if (himnoCargadoRef.current === himnoId && urlHimnoRef.current) return true;
     const reg = await obtenerHimno(himnoId);
-    if (!reg) return false;
+    if (!reg) {
+      setMp3Falta(true);
+      return false;
+    }
+    setMp3Falta(false);
     if (urlHimnoRef.current) URL.revokeObjectURL(urlHimnoRef.current);
     const url = URL.createObjectURL(reg.blob);
     urlHimnoRef.current = url;
@@ -290,9 +294,9 @@ export default function StageView() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-between px-[2.5vw] py-[1.6vh] text-[1.8vh] text-zinc-500">
         <span className="font-medium uppercase tracking-[0.3em]">
           {state.serviceTitle}
-          <span className="font-mono text-zinc-600">{VERSION_APP}</span>
         </span>
         <span className="flex items-center gap-2">
+          <span className="font-mono text-zinc-600">{VERSION_APP}</span>
           <span
             className={cn(
               "h-[1.4vh] w-[1.4vh] rounded-full",
@@ -637,7 +641,7 @@ export default function StageView() {
                 : ""}
             </span>
             <span className="flex items-center gap-2">
-            {mp3Falta && state.himno ? (
+              {mp3Falta && state.himno ? (
                 <span className="text-amber-300/90">
                   Sin MP3 en esta compu — abrí esta pantalla en el mismo navegador
                   donde cargaste los himnos
