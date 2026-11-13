@@ -4,14 +4,14 @@ import { useEffect, useState } from "react";
 
 import PanelView from "@/components/panel-view";
 import PreacherView from "@/components/preacher-view";
-import StageView from "@/components/stage-view";
 
-type View = "panel" | "stage" | "preacher";
+type View = "panel" | "preacher";
 
 function viewFromHash(): View {
   const h = window.location.hash.replace("#", "");
-  if (h === "pantalla") return "stage";
-  if (h === "predicador") return "preacher";
+  // Hay UNA sola pantalla: la del predicador (hace de proyección también).
+  // "#pantalla" queda como alias para que los enlaces viejos sigan funcionando.
+  if (h === "pantalla" || h === "predicador") return "preacher";
   return "panel";
 }
 
@@ -25,7 +25,6 @@ export default function Home() {
     return () => window.removeEventListener("hashchange", apply);
   }, []);
 
-  if (view === "stage") return <StageView />;
   if (view === "preacher") return <PreacherView />;
   return <PanelView />;
 }
