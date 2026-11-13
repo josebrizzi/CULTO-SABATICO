@@ -30,6 +30,12 @@ export interface VersoBiblia {
   chapter: number;
   verse: number;
   version: string;
+  /** Parte que pidió el admin (0 = primera). El admin manda SIEMPRE part:
+   * si el teléfono avanza de parte, reenvía el versículo con part + 1. */
+  part: number;
+  /** Metadatos para el anti-eco del parts-info en el admin. */
+  bookNumber: number | null;
+  pid?: number;
   /** El admin de Biblia Sincronizada manda objetos { t, h } (y a veces strings). */
   words: (string | PalabraBiblia)[];
 }
@@ -141,6 +147,10 @@ interface ProyeccionMsg {
     verse?: number;
     version?: string;
     html?: string;
+    part?: number;
+    bookNumber?: number | null;
+    pid?: number;
+    fondo?: string;
   };
 }
 
@@ -149,6 +159,8 @@ export function useBibliaSocket(url: string): {
   mensaje: MensajeBiblia;
   ocultar: () => void;
   reintentar: () => void;
+  /** Último fondo (tema) difundido por el admin: "claro", "sepia", "azul"… */
+  tema: string;
   /** Envia un dato al servidor (se difunde a todos: admin, proyecciones…).
    * La pantalla del predicador lo usa para avisar cómo cortó el versículo
    * en partes, igual que hacía proyeccion.html. */
@@ -156,6 +168,7 @@ export function useBibliaSocket(url: string): {
 } {
   const [estado, setEstado] = useState<EstadoBiblia>("conectando");
   const [mensaje, setMensaje] = useState<MensajeBiblia>(null);
+  const [tema, setTema] = useState("");
   const [nonce, setNonce] = useState(0);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -172,6 +185,7 @@ export function useBibliaSocket(url: string): {
   // Al cambiar la URL: nueva conexión y se limpia lo mostrado
   useEffect(() => {
     setMensaje(null);
+    setTema("");
     setEstado("conectando");
     setNonce((n) => n + 1);
   }, [url]);
@@ -223,11 +237,19 @@ export function useBibliaSocket(url: string): {
                 chapter: Number(d.chapter) || 0,
                 verse: Number(d.verse) || 0,
                 version: String(d.version || ""),
+                part: Math.max(0, Number(d.part) || 0),
+                bookNumber:
+                  d.bookNumber === undefined || d.bookNumber === null
+                    ? null
+                    : Number(d.bookNumber),
+                pid: d.pid === undefined ? undefined : Number(d.pid),
                 words: Array.isArray(d.words) ? d.words : [],
               },
             });
           } else if (d.type === "freeText" && typeof d.html === "string") {
             setMensaje({ kind: "cita", html: limpiarHtml(d.html) });
+          } else if (d.type === "theme" && typeof d.fondo === "string") {
+            setTema(d.fondo);
           }
         } catch {
           /* mensaje inválido: ignorar */
@@ -257,5 +279,5 @@ export function useBibliaSocket(url: string): {
     setNonce((n) => n + 1);
   };
 
-  return { estado, mensaje, ocultar, reintentar, enviar };
+  return { estado, mensaje, ocultar, reintentar, tema, enviar };
 }
