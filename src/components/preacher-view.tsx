@@ -215,17 +215,17 @@ export default function PreacherView() {
             "animate-card-in max-w-[90vw] truncate rounded-full border-2 px-[4vw] py-[1.3vh] font-black uppercase leading-none tracking-wide",
             COLORS[seg.color].chipDark,
           )}
-          style={{ fontSize: "min(3vw, 4.2vh)" }}
+          style={{ fontSize: "min(3.8vw, 5.4vh)" }}
         >
           {seg.title}
         </div>
 
         {state.status === "paused" ? (
-          <div className="mt-[1.2vh] rounded-full bg-amber-400 px-[2.6vw] py-[0.6vh] text-[2vh] font-bold uppercase tracking-widest text-amber-950">
+          <div className="mt-[1.2vh] rounded-full bg-amber-400 px-[2.8vw] py-[0.8vh] text-[2.6vh] font-bold uppercase tracking-widest text-amber-950">
             En pausa
           </div>
         ) : phase === "overtime" ? (
-          <div className="mt-[1.2vh] rounded-full bg-red-600 px-[2.6vw] py-[0.6vh] text-[2vh] font-bold uppercase tracking-widest text-white">
+          <div className="mt-[1.2vh] rounded-full bg-red-600 px-[2.8vw] py-[0.8vh] text-[2.6vh] font-bold uppercase tracking-widest text-white">
             Tiempo cumplido
           </div>
         ) : null}
@@ -236,15 +236,15 @@ export default function PreacherView() {
             counterColor,
             phase === "overtime" && state.settings.blink && "animate-blink-soft",
           )}
-          style={{ fontSize: "min(10.5vw, 13.5vh)" }}
+          style={{ fontSize: "min(14vw, 19vh)" }}
         >
           {counterText}
         </div>
 
-        <div className="mt-[1.4vh] w-[46vw] max-w-[820px]">
+        <div className="mt-[1.4vh] w-[56vw] max-w-[1000px]">
           <Progress
             value={progressValue}
-            className={cn("h-[0.9vh] bg-white/10", progressClass)}
+            className={cn("h-[1.1vh] bg-white/10", progressClass)}
           />
         </div>
       </div>
@@ -273,7 +273,7 @@ export default function PreacherView() {
           <div
             key={`${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}`}
             className="animate-card-in shrink-0 font-bold uppercase tracking-[0.12em] text-amber-300"
-            style={{ fontSize: "min(3.4vw, 4.6vh)" }}
+            style={{ fontSize: "min(4.6vw, 6.2vh)" }}
           >
             {referenciaDelVerso(mensaje.verso)}
             {mensaje.verso.version ? (
@@ -286,20 +286,20 @@ export default function PreacherView() {
             ref={textoBibliaRef}
             key={`t-${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}`}
             className="animate-card-in mt-[1.6vh] min-h-0 flex-1 overflow-y-auto font-semibold leading-[1.28] text-white"
-            style={{ fontSize: "min(4.4vw, 5.6vh)" }}
+            style={{ fontSize: "min(6.2vw, 8.6vh)" }}
           >
             {textoDelVerso(mensaje.verso)}
           </div>
         </>
       ) : (
         <>
-          <div className="animate-card-in shrink-0 font-bold uppercase tracking-[0.12em] text-amber-300" style={{ fontSize: "min(3.4vw, 4.6vh)" }}>
+          <div className="animate-card-in shrink-0 font-bold uppercase tracking-[0.12em] text-amber-300" style={{ fontSize: "min(4.6vw, 6.2vh)" }}>
             Cita
           </div>
           <div
             ref={textoBibliaRef}
             className="animate-card-in mt-[1.6vh] min-h-0 flex-1 overflow-y-auto font-semibold leading-[1.28] text-white [&_em]:text-amber-200 [&_strong]:text-amber-200"
-            style={{ fontSize: "min(4.4vw, 5.6vh)" }}
+            style={{ fontSize: "min(6.2vw, 8.6vh)" }}
             dangerouslySetInnerHTML={{ __html: mensaje.html }}
           />
         </>
