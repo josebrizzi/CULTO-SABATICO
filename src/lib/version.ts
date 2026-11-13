@@ -4,4 +4,4 @@
  * pantalla del predicador: si dos ventanas no muestran la misma versión,
  * alguna quedó con la página vieja en la caché — recargala (Ctrl+F5).
  */
-export const VERSION_APP = "v0.6.1";
+export const VERSION_APP = "v0.6.2";
