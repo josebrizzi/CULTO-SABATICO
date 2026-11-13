@@ -1262,4 +1262,207 @@ export default function PreacherView() {
               {active && !cardsOn && mode === "script" && seg ? (
                 <div className="absolute inset-0 flex flex-col">
                   <div className="px-[4vw] pt-[6.5vh]">
-                    <div class
+                    <div className="flex items-center gap-3">
+                      <span
+                        className={cn(
+                          "h-[1.8vh] w-[1.8vh] rounded-full",
+                          COLORS[seg.color].dot,
+                        )}
+                      />
+                      <div className="text-[3vh] font-bold">{seg.title}</div>
+                      {state.status === "paused" ? (
+                        <span className="rounded-full bg-amber-400 px-[1.4vw] py-[0.5vh] text-[1.8vh] font-bold uppercase tracking-widest text-amber-950">
+                          En pausa
+                        </span>
+                      ) : null}
+                    </div>
+                    {seg.bullets.length > 0 ? (
+                      <div className="mt-[1.4vh] flex flex-wrap gap-2">
+                        {seg.bullets.map((b, i) => (
+                          <span
+                            key={i}
+                            className={cn(
+                              "rounded-full border px-[1.4vw] py-[0.7vh] text-[2.1vh] font-medium",
+                              COLORS[seg.color].chipDark,
+                            )}
+                          >
+                            {b}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="scrollbar-none mt-[1.5vh] flex-1 overflow-y-auto px-[4vw] pb-[4vh]">
+                    {seg.script.trim() ? (
+                      seg.script.split("\n").map((line, i) =>
+                        line.trim() ? (
+                          <p
+                            key={i}
+                            className="mb-[3.2vh] font-medium text-zinc-100"
+                            style={{ fontSize: fuenteGuion, lineHeight: 1.35 }}
+                          >
+                            {line}
+                          </p>
+                        ) : (
+                          <div key={i} className="h-[1.5vh]" />
+                        ),
+                      )
+                    ) : seg.bullets.length > 0 ? (
+                      <div className="py-[3vh]">
+                        {seg.bullets.map((b, i) => (
+                          <p
+                            key={i}
+                            className="mb-[4vh] font-bold text-zinc-100"
+                            style={{ fontSize: fuentePuntos, lineHeight: 1.3 }}
+                          >
+                            {i + 1}. {b}
+                          </p>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="py-[8vh] text-center text-[2.4vh] text-zinc-600">
+                        El guion de este momento está vacío. Escribilo desde el panel de control.
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-[4vw] py-[1.8vh]">
+                    <div className="flex items-end justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="text-[1.7vh] uppercase tracking-[0.25em] text-zinc-500">
+                          Tiempo del momento
+                        </div>
+                        <div
+                          className={cn(
+                            "font-mono font-bold tabular-nums leading-none",
+                            counterColor,
+                            phase === "overtime" && state.settings.blink && "animate-blink-soft",
+                          )}
+                          style={{ fontSize: "min(8vw, 11vh)" }}
+                        >
+                          {counterText}
+                        </div>
+                      </div>
+                      <div className="shrink-0 text-right text-[2vh] leading-relaxed text-zinc-500">
+                        <div>{seg.minutes} min planificados</div>
+                        <div>
+                          {next ? (
+                            <>
+                              Siguiente: <b className="text-zinc-300">{next.title}</b> ·{" "}
+                              {next.minutes} min
+                            </>
+                          ) : (
+                            "Último momento"
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <Progress
+                      value={progressValue}
+                      className={cn("mt-[1.2vh] h-[0.8vh] bg-white/10", progressClass)}
+                    />
+                  </div>
+                </div>
+              ) : null}
+            </>
+          )}
+
+          {/* ── Mensaje del operador: SOLO el texto, con letra gigante ── */}
+          {state.message ? (
+            <div className="fixed inset-0 z-50 flex items-center justify-center p-[4vw]">
+              <div
+                className={cn(
+                  "animate-pulse-border flex w-full items-center justify-center rounded-[3rem] px-[4vw] py-[8vh] text-center shadow-2xl",
+                  state.message.urgent ? "bg-red-600 text-white" : "bg-amber-400 text-zinc-950",
+                )}
+              >
+                <div
+                  className="text-balance font-black leading-[1.08]"
+                  style={{ fontSize: tamMensaje }}
+                >
+                  {state.message.text}
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* ── Controles flotantes (se ocultan solos; con un mensaje en
+                 pantalla NO se muestran: solo queda el mensaje) ── */}
+          <div
+            className={cn(
+              "absolute bottom-[2.5vh] right-[1.5vw] z-[60] flex flex-col items-end gap-2 transition-opacity duration-300",
+              uiVisible && !state.message ? "opacity-100" : "pointer-events-none opacity-0",
+            )}
+          >
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                aria-label="Cambiar a la pantalla Biblia"
+                title="Pantalla Biblia: proyección con cuenta regresiva (tecla B)"
+                onClick={alternarModo}
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+              >
+                <BookOpen className="h-5 w-5" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Configurar Biblia Sincronizada"
+                title="Configurar Biblia Sincronizada"
+                onClick={abrirConf}
+                className={cn(
+                  "grid h-11 w-11 place-items-center rounded-full border backdrop-blur transition-colors",
+                  confAbierta
+                    ? "border-emerald-400/60 bg-emerald-600/30 text-emerald-200"
+                    : "border-white/20 bg-black/60 text-white hover:bg-white/20",
+                )}
+              >
+                <Settings2 className="h-5 w-5" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Volver al panel"
+                title="Volver al panel"
+                onClick={goPanel}
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+              >
+                <PanelLeft className="h-5 w-5" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                aria-label="Pantalla completa"
+                title="Pantalla completa"
+                onClick={toggleFullscreen}
+                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+              >
+                <Maximize className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* Panel de configuración (compartido por los dos modos) */}
+      {panelConfig}
+
+      {/* Medidor oculto: MISMA tipografía y MISMO ancho que la caja de la
+          proyección (88vw × 82vh, CMG Sans 700). Sirve para cortar el
+          versículo en partes de 4 renglones igual que proyeccion.html. */}
+      <div
+        ref={proyMedidorRef}
+        aria-hidden="true"
+        className="proy-texto"
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          zIndex: -1,
+          width: "88vw",
+          visibility: "hidden",
+          pointerEvents: "none",
+          fontFamily: "'CMG Sans', 'Roboto', Arial, sans-serif",
+        }}
+      />
+    </div>
+  );
+}
