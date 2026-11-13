@@ -11,7 +11,6 @@ import {
 import {
   BookOpen,
   Maximize,
-  MessageSquare,
   PanelLeft,
   Settings2,
   X,
@@ -28,6 +27,7 @@ import {
   useBibliaSocket,
 } from "@/lib/biblia";
 import {
+  BibliaDisplay,
   COLORS,
   cardsActive,
   currentSegment,
@@ -157,7 +157,7 @@ function cortarEnN(palabras: Palabra[], N: number): [number, number][] {
  *   mensajes del operador.
  */
 export default function PreacherView() {
-  const { state, peerOnline } = useShowChannel("stage");
+  const { state, peerOnline, sendAction } = useShowChannel("stage");
 
   const [now, setNow] = useState(0);
   useEffect(() => {
@@ -339,6 +339,52 @@ export default function PreacherView() {
 
   const conBiblia = mensaje !== null;
 
+  /* ─────── Espejo para la mini pantalla del panel ───────
+     Le cuenta al panel qué letra bíblica se está mostrando en esta
+     pantalla (referencia, versión, la parte visible y el total), para
+     que la mini pantalla incrustada del panel replique lo que se ve
+     acá. El contador y los mensajes ya los sabe el panel: vienen en
+     el estado compartido. */
+  const espejoBiblia = useMemo<Omit<BibliaDisplay, "ts"> | null>(() => {
+    if (!mensaje) return null;
+    if (mensaje.kind === "verso") {
+      return {
+        ref: referenciaDelVerso(mensaje.verso),
+        version: mensaje.verso.version ? abreviarVersion(mensaje.verso.version) : "",
+        html: parteHtml,
+        parte: Math.min(parte + 1, Math.max(1, totalPartes)),
+        totalPartes: Math.max(1, totalPartes),
+      };
+    }
+    return { ref: "Cita", version: "", html: mensaje.html, parte: 1, totalPartes: 1 };
+  }, [mensaje, parteHtml, parte, totalPartes]);
+
+  const espejoRef = useRef(espejoBiblia);
+  useEffect(() => {
+    espejoRef.current = espejoBiblia;
+  }, [espejoBiblia]);
+
+  // Se envía al cambiar lo que se muestra…
+  useEffect(() => {
+    sendAction({
+      type: "STAGE_BIBLIA",
+      biblia: espejoBiblia ? { ...espejoBiblia, ts: Date.now() } : null,
+    });
+  }, [espejoBiblia, sendAction]);
+
+  // …y además un latido cada 4 s: si el panel se recargó, vuelve a
+  // recibir el espejo solo, sin tocar nada.
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      const base = espejoRef.current;
+      sendAction({
+        type: "STAGE_BIBLIA",
+        biblia: base ? { ...base, ts: Date.now() } : null,
+      });
+    }, 4000);
+    return () => window.clearInterval(id);
+  }, [sendAction]);
+
   /* ─────────────── Ocultar cursor y controles al inactividad ─────────────── */
 
   const [uiVisible, setUiVisible] = useState(true);
@@ -447,12 +493,42 @@ export default function PreacherView() {
      cantidad de renglones (igual que la vieja pantalla de proyección). */
   function cardFontSize(text: string, lines: number): string {
     const len = text.length;
-    const capLenW = len <= 40 ? "9vw" : len <= 90 ? "7.5vw" : len <= 160 ? "6vw" : len <= 260 ? "5vw" : "4vw";
-    const capLenH = len <= 40 ? "15vh" : len <= 90 ? "12vh" : len <= 160 ? "9.5vh" : len <= 260 ? "7.5vh" : "6vh";
-    const capLinesW = lines <= 1 ? "9vw" : lines <= 3 ? "6.5vw" : lines <= 5 ? "5vw" : lines <= 7 ? "4vw" : "3.2vw";
-    const capLinesH = lines <= 1 ? "15vh" : lines <= 3 ? "9.5vh" : lines <= 5 ? "7vh" : lines <= 7 ? "5.6vh" : "4.6vh";
+    const capLenW = len <= 40 ? "12.5vw" : len <= 90 ? "10vw" : len <= 160 ? "8vw" : len <= 260 ? "6.5vw" : "5vw";
+    const capLenH = len <= 40 ? "18vh" : len <= 90 ? "14.5vh" : len <= 160 ? "11vh" : len <= 260 ? "8.5vh" : "6.5vh";
+    const capLinesW = lines <= 1 ? "12.5vw" : lines <= 3 ? "9vw" : lines <= 5 ? "6.5vw" : lines <= 7 ? "5vw" : "4vw";
+    const capLinesH = lines <= 1 ? "18vh" : lines <= 3 ? "12vh" : lines <= 5 ? "9vh" : lines <= 7 ? "7vh" : "5.5vh";
     return `min(${capLenW}, ${capLenH}, ${capLinesW}, ${capLinesH})`;
   }
+
+  /* ── Letra GIGANTE: guion, puntos numerados y mensaje del operador ──
+     La idea: una palabra corta (ej. "ORACION") tiene que ocupar como mínimo
+     la mitad de la pantalla. Si hay varios renglones, se achican para que
+     entren todos sin scrollear. */
+
+  /* Renglones del guion: grandes, con ajuste según la cantidad. */
+  const lineasScript = (seg?.script ?? "").split("\n").filter((l) => l.trim());
+  const fuenteGuion = `min(9vw, ${Math.min(
+    12.5,
+    Math.max(4.5, (60 / Math.max(1, lineasScript.length) - 3.2) / 1.35),
+  )}vh)`;
+
+  /* Puntos numerados (cuando el guion está vacío): el triple o más. */
+  const nPuntos = seg?.bullets.length ?? 1;
+  const fuentePuntos = `min(12.5vw, ${Math.min(
+    17,
+    Math.max(4.5, (60 / Math.max(1, nPuntos) - 4) / 1.3),
+  )}vh)`;
+
+  /* Mensaje del operador: SOLO el texto, gigante, sin leyendas ni títulos.
+     Si es muy largo, baja un poco para que entre en la pantalla. Con texto
+     corto (ej. "CERRÁ CON ORACIÓN") la caja ocupa como media pantalla. */
+  const largoMsg = state.message?.text.length ?? 0;
+  const tamMensaje =
+    largoMsg <= 24
+      ? "min(15vw, 22vh)"
+      : largoMsg <= 60
+        ? "min(10.5vw, 15vh)"
+        : "min(8vw, 11vh)";
 
   /* ───── Barra inferior: momento a la izquierda + tiempo grande a la derecha ───── */
 
@@ -864,7 +940,7 @@ export default function PreacherView() {
                       <p
                         key={i}
                         className="mb-[3.2vh] font-medium text-zinc-100"
-                        style={{ fontSize: "min(3.2vw, 4.6vh)", lineHeight: 1.4 }}
+                        style={{ fontSize: fuenteGuion, lineHeight: 1.35 }}
                       >
                         {line}
                       </p>
@@ -878,7 +954,7 @@ export default function PreacherView() {
                       <p
                         key={i}
                         className="mb-[4vh] font-bold text-zinc-100"
-                        style={{ fontSize: "min(3.8vw, 5.4vh)", lineHeight: 1.35 }}
+                        style={{ fontSize: fuentePuntos, lineHeight: 1.3 }}
                       >
                         {i + 1}. {b}
                       </p>
@@ -932,27 +1008,18 @@ export default function PreacherView() {
         </>
       )}
 
-      {/* ── Mensaje del operador (se ve en esta pantalla, como antes) ── */}
+      {/* ── Mensaje del operador: SOLO el texto, con letra gigante ── */}
       {state.message ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-[5vw]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-[4vw]">
           <div
             className={cn(
-              "animate-pulse-border w-full rounded-[3rem] px-[4vw] py-[5vh] text-center shadow-2xl",
+              "animate-pulse-border flex w-full items-center justify-center rounded-[3rem] px-[4vw] py-[8vh] text-center shadow-2xl",
               state.message.urgent ? "bg-red-600 text-white" : "bg-amber-400 text-zinc-950",
             )}
           >
             <div
-              className={cn(
-                "flex items-center justify-center gap-2 text-[1.9vh] font-bold uppercase tracking-[0.3em]",
-                state.message.urgent ? "text-white/80" : "text-zinc-700",
-              )}
-            >
-              <MessageSquare className="h-[2.2vh] w-[2.2vh]" aria-hidden="true" />
-              Mensaje del operador
-            </div>
-            <div
-              className="mt-[2.5vh] font-black leading-tight"
-              style={{ fontSize: "min(6.5vw, 9vh)" }}
+              className="text-balance font-black leading-[1.08]"
+              style={{ fontSize: tamMensaje }}
             >
               {state.message.text}
             </div>
@@ -964,7 +1031,9 @@ export default function PreacherView() {
       <div
         className={cn(
           "absolute bottom-[13.5vh] right-[1.5vw] z-[60] transition-opacity duration-300",
-          uiVisible && confAbierta ? "opacity-100" : "pointer-events-none opacity-0",
+          uiVisible && confAbierta && !state.message
+            ? "opacity-100"
+            : "pointer-events-none opacity-0",
         )}
       >
         <div className="w-[330px] max-w-[86vw] space-y-2 rounded-xl border border-white/15 bg-black/85 p-3.5 text-left backdrop-blur">
@@ -1012,11 +1081,12 @@ export default function PreacherView() {
         </div>
       </div>
 
-      {/* ── Controles flotantes (se ocultan solos) ── */}
+      {/* ── Controles flotantes (se ocultan solos; con un mensaje en
+             pantalla NO se muestran: solo queda el mensaje) ── */}
       <div
         className={cn(
           "absolute bottom-[2.5vh] right-[1.5vw] z-[60] flex flex-col items-end gap-2 transition-opacity duration-300",
-          uiVisible ? "opacity-100" : "pointer-events-none opacity-0",
+          uiVisible && !state.message ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       >
         <div className="flex items-center gap-2">
