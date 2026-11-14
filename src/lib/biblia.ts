@@ -31,11 +31,14 @@ export interface VersoBiblia {
   verse: number;
   version: string;
   /** Parte que pidió el admin (0 = primera). El admin manda SIEMPRE part:
-   * si el teléfono avanza de parte, reenvía el versículo con part + 1. */
+   *  si el teléfono avanza de parte, reenvía el versículo con part + 1. */
   part: number;
   /** Metadatos para el anti-eco del parts-info en el admin. */
   bookNumber: number | null;
   pid?: number;
+  /** Referencia lista para mostrar: la manda el panel del culto y se
+   *  muestra tal cual (permite rangos como "Juan 3:16-17"). */
+  label?: string;
   /** El admin de Biblia Sincronizada manda objetos { t, h } (y a veces strings). */
   words: (string | PalabraBiblia)[];
 }
@@ -106,6 +109,7 @@ export function textoDelVerso(v: VersoBiblia): string {
 }
 
 export function referenciaDelVerso(v: VersoBiblia): string {
+  if (v.label) return v.label;
   return `${abreviarLibro(v.bookName)} ${v.chapter}:${v.verse}`;
 }
 
@@ -150,6 +154,7 @@ interface ProyeccionMsg {
     part?: number;
     bookNumber?: number | null;
     pid?: number;
+    label?: string;
     fondo?: string;
   };
 }
@@ -243,6 +248,8 @@ export function useBibliaSocket(url: string): {
                     ? null
                     : Number(d.bookNumber),
                 pid: d.pid === undefined ? undefined : Number(d.pid),
+                label:
+                  typeof d.label === "string" && d.label ? d.label : undefined,
                 words: Array.isArray(d.words) ? d.words : [],
               },
             });
@@ -250,6 +257,9 @@ export function useBibliaSocket(url: string): {
             setMensaje({ kind: "cita", html: limpiarHtml(d.html) });
           } else if (d.type === "theme" && typeof d.fondo === "string") {
             setTema(d.fondo);
+          } else if (d.type === "clear") {
+            // El panel del culto pidió ocultar la letra a distancia.
+            setMensaje(null);
           }
         } catch {
           /* mensaje inválido: ignorar */
