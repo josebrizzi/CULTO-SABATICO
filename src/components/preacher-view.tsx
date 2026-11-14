@@ -713,7 +713,7 @@ export default function PreacherView() {
         title="Quitar el texto de esta pantalla"
         onClick={ocultar}
         className={cn(
-          "absolute right-[1.5vw] top-[6vh] z-30 grid h-10 w-10 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-opacity duration-300 hover:bg-white/20",
+          "absolute right-[1.5vw] top-[6vh] z-30 grid h-10 w-10 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-opacity duration-300 hover:bg-[rgba(139,92,246,.30)]",
           uiVisible ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       >
@@ -827,7 +827,13 @@ export default function PreacherView() {
       {barraActiva && seg ? (
         <div
           className="absolute inset-x-0 bottom-0 z-40 text-white"
-          style={{ height: "9vh", background: "rgba(0,0,0,0.78)" }}
+          style={{
+            height: "9vh",
+            background:
+              "linear-gradient(90deg, rgba(5,6,18,.88), rgba(26,13,58,.88) 55%, rgba(5,6,18,.88))",
+            borderTop: "2px solid rgba(139,92,246,.55)",
+            boxShadow: "0 -10px 34px rgba(139,92,246,.28)",
+          }}
         >
           <div className="flex h-full items-center justify-between gap-[2vw] px-[3vw] pb-[0.6vh]">
             <div className="flex min-w-0 items-center gap-[1vw]">
@@ -889,7 +895,7 @@ export default function PreacherView() {
           </button>
         ) : null}
         {state.message ? (
-          <div className="proy-badge" style={{ background: "#b45309" }}>
+          <div className="proy-badge" style={{ background: "#FDE047", color: "#1A1503" }}>
             Mensaje en espera · B
           </div>
         ) : null}
@@ -909,7 +915,7 @@ export default function PreacherView() {
             aria-label="Cambiar a la pantalla de culto"
             title="Pantalla de culto: avisos, guion y mensajes (tecla B)"
             onClick={alternarModo}
-            className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
           >
             <Monitor className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -918,7 +924,7 @@ export default function PreacherView() {
             aria-label="Cambiar el fondo de la proyección"
             title={`Fondo: ${FONDO_NOMBRE[fondo]} (clic para cambiar)`}
             onClick={ciclarFondo}
-            className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
           >
             <Palette className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -931,7 +937,7 @@ export default function PreacherView() {
               "grid h-11 w-11 place-items-center rounded-full border backdrop-blur transition-colors",
               confAbierta
                 ? "border-emerald-400/60 bg-emerald-600/30 text-emerald-200"
-                : "border-white/20 bg-black/60 text-white hover:bg-white/20",
+                : "border-white/20 bg-black/60 text-white hover:bg-[rgba(139,92,246,.30)]",
             )}
           >
             <Settings2 className="h-5 w-5" aria-hidden="true" />
@@ -941,7 +947,7 @@ export default function PreacherView() {
             aria-label="Volver al panel"
             title="Volver al panel"
             onClick={goPanel}
-            className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
           >
             <PanelLeft className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -950,7 +956,7 @@ export default function PreacherView() {
             aria-label="Pantalla completa"
             title="Pantalla completa"
             onClick={toggleFullscreen}
-            className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
           >
             <Maximize className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -1033,9 +1039,9 @@ export default function PreacherView() {
       ) : (
         <>
           {/* Barra superior discreta */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-end px-[2.5vw] py-[1.6vh] text-[1.8vh] text-zinc-500">
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-end px-[2.5vw] py-[1.6vh] text-[1.8vh] text-[#AEB8DD]/70">
             <span className="flex items-center gap-3">
-              <span className="font-mono text-zinc-600">{VERSION_APP}</span>
+              <span className="font-mono text-[#A78BFA]/80">{VERSION_APP}</span>
               <span className="flex items-center gap-1.5" title={estadoBibliaLabel}>
                 <BookOpen
                   className={cn(
@@ -1400,7 +1406,7 @@ export default function PreacherView() {
                 aria-label="Cambiar a la pantalla Biblia"
                 title="Pantalla Biblia: proyección con cuenta regresiva (tecla B)"
                 onClick={alternarModo}
-                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
               >
                 <BookOpen className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -1413,7 +1419,7 @@ export default function PreacherView() {
                   "grid h-11 w-11 place-items-center rounded-full border backdrop-blur transition-colors",
                   confAbierta
                     ? "border-emerald-400/60 bg-emerald-600/30 text-emerald-200"
-                    : "border-white/20 bg-black/60 text-white hover:bg-white/20",
+                    : "border-white/20 bg-black/60 text-white hover:bg-[rgba(139,92,246,.30)]",
                 )}
               >
                 <Settings2 className="h-5 w-5" aria-hidden="true" />
@@ -1423,7 +1429,7 @@ export default function PreacherView() {
                 aria-label="Volver al panel"
                 title="Volver al panel"
                 onClick={goPanel}
-                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
               >
                 <PanelLeft className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -1432,7 +1438,7 @@ export default function PreacherView() {
                 aria-label="Pantalla completa"
                 title="Pantalla completa"
                 onClick={toggleFullscreen}
-                className="grid h-11 w-11 place-items-center rounded-full border border-white/20 bg-black/60 text-white backdrop-blur transition-colors hover:bg-white/20"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
               >
                 <Maximize className="h-5 w-5" aria-hidden="true" />
               </button>
