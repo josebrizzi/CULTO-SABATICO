@@ -1317,3 +1317,455 @@ export default function PanelView() {
     </div>
   );
 }
+
+/* ─────────────────────── Editor de momento ─────────────────────── */
+
+function SegmentEditor({
+  seg,
+  onUpdate,
+  onDelete,
+  onJump,
+  canDelete,
+}: {
+  seg: Segment;
+  onUpdate: (patch: Partial<Segment>) => void;
+  onDelete: () => void;
+  onJump: () => void;
+  canDelete: boolean;
+}) {
+  const [bulletDraft, setBulletDraft] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const addBullet = () => {
+    const t = bulletDraft.trim();
+    if (!t) return;
+    onUpdate({ bullets: [...seg.bullets, t] });
+    setBulletDraft("");
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2 space-y-1">
+          <Label htmlFor={`t-${seg.id}`} className="text-xs">
+            Título
+          </Label>
+          <Input
+            id={`t-${seg.id}`}
+            className="cns-in"
+            value={seg.title}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`s-${seg.id}`} className="text-xs">
+            Orador
+          </Label>
+          <Input
+            id={`s-${seg.id}`}
+            className="cns-in"
+            value={seg.speaker}
+            placeholder="Ej.: Anunciador"
+            onChange={(e) => onUpdate({ speaker: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`m-${seg.id}`} className="text-xs">
+            Duración (min)
+          </Label>
+          <Input
+            id={`m-${seg.id}`}
+            className="cns-in"
+            type="number"
+            min={1}
+            max={600}
+            value={seg.minutes}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) onUpdate({ minutes: Math.min(600, Math.max(1, Math.round(v))) });
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">Cómo se muestra en la pantalla</Label>
+        <Select
+          value={seg.layout}
+          onValueChange={(v) => onUpdate({ layout: v === "script" ? "script" : "timer" })}
+        >
+          <SelectTrigger className="cns-in">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="cns-pop">
+            <SelectItem value="timer">Contador grande</SelectItem>
+            <SelectItem value="script">Guion + contador abajo</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "rgba(140,165,200,.18)" }}>
+        <div className="min-w-0">
+          <Label htmlFor={`c-${seg.id}`} className="text-xs font-medium">
+            Tarjeta grande en pantalla
+          </Label>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            Muestra todos los puntos juntos en una sola tarjeta, con letra grande
+            (ideal para los anuncios; anula el guion y el contador grande).
+          </p>
+        </div>
+        <Switch
+          id={`c-${seg.id}`}
+          checked={seg.cards}
+          onCheckedChange={(v) => onUpdate({ cards: v })}
+          className="mt-0.5 shrink-0"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">
+          {seg.cards ? "Puntos de la tarjeta" : "Puntos clave"}
+        </Label>
+        {seg.bullets.map((b, i) => (
+        <div key={i} className="flex gap-1.5">
+            {seg.cards ? (
+              <Textarea
+                className="cns-in"
+                value={b}
+                rows={2}
+                aria-label={`Punto ${i + 1}`}
+                onChange={(e) => {
+                  const arr = [...seg.bullets];
+                  arr[i] = e.target.value;
+                  onUpdate({ bullets: arr });
+                }}
+              />
+            ) : (
+              <Input
+                className="cns-in"
+                value={b}
+                aria-label={`Punto ${i + 1}`}
+                onChange={(e) => {
+                  const arr = [...seg.bullets];
+                  arr[i] = e.target.value;
+                  onUpdate({ bullets: arr });
+                }}
+              />
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="cns-icobtn h-10 w-9 shrink-0 self-start"
+              aria-label={`Quitar punto ${i + 1}`}
+              onClick={() => onUpdate({ bullets: seg.bullets.filter((_, j) => j !== i) })}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ))}
+        <div className="flex gap-1.5">
+          <Input
+            className="cns-in"
+            value={bulletDraft}
+            placeholder="Agregar punto…"
+            aria-label="Nuevo punto clave"
+            onChange={(e) => setBulletDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addBullet();
+            }}
+          />
+          <Button
+            size="icon"
+            variant="outline"
+            className="cns-btn-line h-10 w-9 shrink-0"
+            aria-label="Agregar punto"
+            onClick={addBullet}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">
+          Guion extendido (se muestra en la pantalla del predicador)
+          {seg.cards ? " — queda anulado mientras la tarjeta esté activa" : ""}
+        </Label>
+        <Textarea
+          className="cns-in"
+          value={seg.script}
+          rows={4}
+          placeholder="Texto más largo que se muestra en la pantalla del predicador…"
+          onChange={(e) => onUpdate({ script: e.target.value })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <Button size="sm" variant="secondary" onClick={onJump}>
+          <SkipForward className="h-3.5 w-3.5" aria-hidden="true" /> Ir a este momento
+        </Button>
+        {canDelete ? (
+          confirmDelete ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                onDelete();
+                setConfirmDelete(false);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Confirmar
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-[#E2604F] hover:text-[#E2604F]"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar
+            </Button>
+          )
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────── Ayuda ─────────────────────────────── */
+
+function HelpDialog() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost" className="cns-icobtn" aria-label="Ayuda de uso">
+          <HelpCircle className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="cns-modal max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Cómo usar con el proyector</DialogTitle>
+          <DialogDescription>
+            Sistema de control de tiempos para el culto: contador, tarjetas y mensajes
+            al orador.
+          </DialogDescription>
+        </DialogHeader>
+        <ol className="list-decimal space-y-2.5 pl-5 text-sm">
+          <li>
+            Tocá <b>“Abrir pantalla del predicador”</b>: es la única pantalla — hace
+            de proyección y de pantalla del predicador a la vez. Con un solo monitor,
+            abrí esa y listo: muestra el contador, las tarjetas de avisos, la letra
+            bíblica y los mensajes.
+          </li>
+          <li>
+            Ponela en pantalla completa con el botón de la esquina (o con <b>F11</b>)
+            y proyectala al monitor o TV de la iglesia.
+          </li>
+          <li>
+            Volvé a esta ventana y manejá el culto desde la <b>secuencia horizontal</b>{" "}
+            de arriba: tocá un momento para saltar a él, y editá cada uno con el{" "}
+            <b>lápiz</b>. Mensajes al orador en la columna de la derecha.
+          </li>
+        </ol>
+        <div className="cns-sep" />
+        <div className="cns-note">
+          <b>Avisos en una sola tarjeta:</b> en la sección <b>“Ahora”</b> activá el
+          interruptor <b>Tarjetas</b> y escribí los puntos ahí mismo: todos se ven
+          juntos en <b>una sola tarjeta gigante</b> en la pantalla del predicador, y los
+          vas editando en vivo. Los avisos de un momento futuro se preparan con el
+          lápiz de ese momento en la secuencia.
+        </div>
+        <div className="cns-sep" />
+        <ul className="space-y-1.5 text-xs text-muted-foreground">
+          <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
+          <li>
+            · Los versículos de <b>Biblia Sincronizada</b> (elegidos en su{" "}
+            <b>admin.html</b>) aparecen en vivo con el contador abajo, cortados en
+            partes de 4 renglones igual que la proyección: tocá el texto o usá ← →
+            para cambiar de parte. El servidor se cambia con el engranaje de esa
+            pantalla.
+          </li>
+          <li>
+            · Los mensajes del operador también salen en esta pantalla, encima de
+            todo lo demás: solo se ve el mensaje (rojo si es urgente, amarillo si
+            no), sin títulos ni leyendas.
+          </li>
+          <li>
+            · La <b>mini pantalla</b> de la columna derecha muestra en vivo lo que
+            se ve en la pantalla del predicador (letra bíblica, tarjeta, contador
+            y mensajes).
+          </li>
+          <li>
+            · El contador pasa de claro a ámbar en los minutos finales y a rojo
+            cuando se cumple el tiempo.
+          </li>
+          <li>· Los datos quedan guardados en este navegador.</li>
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/* ────────────── Mini pantalla del predicador (incrustada) ────────────── */
+
+/* Tamaño de diseño de la mini pantalla: 320×180 (16:9). Todo lo de adentro
+   se dibuja en píxeles de este espacio y después se escala al ancho real de
+   la tarjeta, así la replica se ve igual en cualquier ancho de columna. */
+const MINI_ANCHO = 320;
+const MINI_ALTO = 180;
+
+/** Mide el ancho disponible y devuelve cuánto hay que escalar el diseño. */
+function useFitScale(base: number) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  const [scale, setScale] = useState(0);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const update = () => setScale(el.clientWidth / base);
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [base]);
+  return { ref, scale };
+}
+
+/* Barra inferior en chico: momento a la izquierda + contador a la derecha. */
+function MiniBarra({
+  seg,
+  counterText,
+  counterColor,
+  progressValue,
+  progressClass,
+  paused,
+  grande,
+}: {
+  seg: Segment;
+  counterText: string;
+  counterColor: string;
+  progressValue: number;
+  progressClass: string;
+  paused: boolean;
+  /** true = como en el modo biblia: contador bien grande a la derecha */
+  grande?: boolean;
+}) {
+  return (
+    <div>
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex min-w-0 items-center gap-1 pb-1">
+          <div
+            className={cn(
+              "min-w-0 max-w-[46%] truncate rounded-full border-2 px-2 font-black uppercase leading-none tracking-wide",
+              COLORS[seg.color].chipDark,
+            )}
+            style={{ fontSize: 8, paddingTop: 3, paddingBottom: 3 }}
+          >
+            {seg.title}
+          </div>
+          {paused ? (
+            <div
+              className="shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
+              style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+            >
+              Pausa
+            </div>
+          ) : null}
+        </div>
+        <div
+          className={cn(
+            "shrink-0 font-mono font-bold tabular-nums leading-none",
+            counterColor,
+          )}
+          style={{ fontSize: grande ? 32 : 22 }}
+        >
+          {counterText}
+        </div>
+      </div>
+      <Progress
+        value={progressValue}
+        className={cn("mt-1 h-[3px] bg-white/10", progressClass)}
+      />
+    </div>
+  );
+}
+
+/** Réplica en chico de la pantalla del predicador: muestra lo mismo que se
+    proyecta en ese momento — letra bíblica, tarjeta de avisos, guion,
+    contador grande y mensajes del operador. */
+function MiniPantalla({
+  state,
+  now,
+  biblia,
+}: {
+  state: ShowState;
+  now: number;
+  biblia: BibliaDisplay | null;
+}) {
+  const { ref, scale } = useFitScale(MINI_ANCHO);
+
+  const seg = currentSegment(state);
+  const active = state.currentIndex >= 0 && seg !== null;
+  const totalMs = (seg?.minutes ?? 0) * 60000;
+  const elapsed = active ? elapsedCurrent(state, now) : 0;
+  const remaining = active ? totalMs - elapsed : 0;
+  const overtimeMs = active ? Math.max(0, elapsed - totalMs) : 0;
+  const phase = active ? phaseOf(remaining, state.settings.warningMin) : "idle";
+  const live = now > 0 && active;
+  const cardsOn = active && cardsActive(seg);
+  const mode = seg?.layout ?? "timer";
+  const paused = state.status === "paused";
+
+  const counterText = live
+    ? phase === "overtime"
+      ? `+${fmtHMS(Math.floor(overtimeMs / 1000))}`
+      : fmtHMS(Math.ceil(remaining / 1000))
+    : "--:--";
+  const counterColor =
+    phase === "overtime"
+      ? "text-red-500"
+      : phase === "warning"
+        ? "text-amber-300"
+        : "text-white";
+  const progressValue = totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0;
+  const progressClass =
+    phase === "overtime"
+      ? "[&>div]:bg-red-500"
+      : phase === "warning"
+        ? "[&>div]:bg-amber-400"
+        : "[&>div]:bg-white/80";
+
+  const msg = state.message;
+
+  /* Contenido: lo mismo que muestra la pantalla del predicador, en chico */
+  let contenido: ReactNode = null;
+
+  if (msg) {
+    // Mensaje del operador: SOLO el texto (rojo o amarillo), como en grande
+    const len = msg.text.length;
+    contenido = (
+      <div className="absolute inset-0 flex items-center justify-center p-2.5">
+        <div
+          className={cn(
+            "flex h-full w-full items-center justify-center rounded-2xl px-2.5 text-center font-black leading-[1.1]",
+            msg.urgent ? "bg-red-600 text-white" : "bg-amber-400 text-zinc-950",
+          )}
+        >
+          <span style={{ fontSize: len <= 24 ? 36 : len <= 60 ? 26 : 19 }}>
+            {msg.text}
+          </span>
+        </div>
+      </div>
+    );
+  } else if (biblia) {
+    // Letra bíblica (con el tiempo abajo si el culto está en marcha)
+    contenido = (
+      <div className="absolute inset-0 flex flex-col">
+        <div className="flex min-h-0 flex-1 flex-col px-4 pb-1 pt-2.5">
+          <div className="flex items-end justify-between gap-1.5">
+            <div
+              className="min-w-0 truncate font-bold uppercase tracking-wider text-amber-300"
+              style={{ fontSize: 10 }}
+            >
+              {biblia.ref}
+              {biblia.version ? (
+                <span
