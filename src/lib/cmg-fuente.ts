@@ -66,6 +66,7 @@ const F900 = [
 
 /** CSS completo de la réplica de proyección: fuentes + temas + clases. */
 export const ESTILO_PROYECCION = `
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&display=swap');
 @font-face { font-family: 'CMG Sans'; font-style: normal; font-weight: 400; font-display: block; src: url(data:font/woff2;base64,${F400}) format('woff2'); }
 @font-face { font-family: 'CMG Sans'; font-style: normal; font-weight: 700; font-display: block; src: url(data:font/woff2;base64,${F700}) format('woff2'); }
 @font-face { font-family: 'CMG Sans'; font-style: normal; font-weight: 900; font-display: block; src: url(data:font/woff2;base64,${F900}) format('woff2'); }
@@ -104,15 +105,17 @@ export const ESTILO_PROYECCION = `
 .proy-f-oscuro .proy-ref, .proy-f-doodle-oscuro .proy-ref { color: #7fd4b5; }
 .proy-f-azul .proy-ref { color: #bcd7ff; }
 .proy-status {
-  padding: 6px 10px; border-radius: 20px;
-  background: #ddd; color: #555; font-size: 12px; opacity: 0.45;
-  font-family: 'CMG Sans', Arial, sans-serif;
+  padding: 6px 12px; border-radius: 20px;
+  background: rgba(8,10,28,.72); color: #C9D2F0; font-size: 12px; opacity: 0.55;
+  font-family: 'Space Grotesk', 'CMG Sans', Arial, sans-serif;
+  border: 1px solid rgba(167,139,250,.35);
 }
-.proy-status.conectado { background: #dcece5; color: #173f35; }
+.proy-status.conectado { background: rgba(74,222,128,.16); color: #BBF7D0; border-color: rgba(74,222,128,.45); }
 .proy-badge {
   padding: 9px 16px; border-radius: 22px;
-  background: #173f35; color: #fff;
-  font-family: 'CMG Sans', Arial, sans-serif; font-size: 15px; font-weight: bold;
-  cursor: pointer; opacity: 0.9; border: none;
+  background: linear-gradient(135deg, #8B5CF6, #6366F1); color: #fff;
+  font-family: 'Space Grotesk', 'CMG Sans', Arial, sans-serif; font-size: 15px; font-weight: bold;
+  cursor: pointer; opacity: 0.92; border: 1px solid rgba(196,181,253,.55);
+  box-shadow: 0 0 18px rgba(139,92,246,.35);
 }
 `;
