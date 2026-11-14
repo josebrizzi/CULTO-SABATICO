@@ -31,7 +31,7 @@ export interface VersoBiblia {
   verse: number;
   version: string;
   /** Parte que pidió el admin (0 = primera). El admin manda SIEMPRE part:
-   *  si el teléfono avanza de parte, reenvía el versículo con part + 1. */
+   * si el teléfono avanza de parte, reenvía el versículo con part + 1. */
   part: number;
   /** Metadatos para el anti-eco del parts-info en el admin. */
   bookNumber: number | null;
