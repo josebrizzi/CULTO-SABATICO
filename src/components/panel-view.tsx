@@ -801,3 +801,519 @@ export default function PanelView() {
             </div>
           </div>
         </section>
+
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(300px,370px)]">
+          {/* ═══ Columna central (arriba en móvil) ═══ */}
+          <div className="space-y-5">
+            {/* ── Mesa de control: el momento en curso ── */}
+            <section
+              className={cn(
+                "cns-panel cns-rise",
+                active && "border-[rgba(198,164,91,0.30)]",
+              )}
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 px-5 pt-4">
+                <div className="min-w-0">
+                  <div className="cns-eyebrow">Mesa de control</div>
+                  <h2 className="cns-h2 mt-1 truncate">
+                    {active ? `Ahora · ${seg?.title}` : "Ahora"}
+                  </h2>
+                </div>
+                {statusPill}
+              </div>
+              {active && (seg?.speaker || next) ? (
+                <p className="cns-sub px-5 pt-1">
+                  {seg?.speaker ? `Orador: ${seg.speaker}` : null}
+                  {seg?.speaker && next ? " · " : null}
+                  {next ? `Siguiente: ${next.title} (${next.minutes} min)` : null}
+                </p>
+              ) : null}
+
+              <div className="px-5 pb-5 pt-4">
+                {state.status === "finished" ? (
+                  <div className="py-8 text-center">
+                    <div className="cns-h2 text-3xl">Culto finalizado</div>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Reiniciá para comenzar un nuevo culto.
+                    </p>
+                    <Button
+                      className="cns-btn-line mt-4"
+                      variant="outline"
+                      onClick={doRestartService}
+                    >
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" /> Reiniciar
+                      todo
+                    </Button>
+                  </div>
+                ) : !active ? (
+                  <div className="py-6 text-center">
+                    <div className="cns-h2 text-2xl">El culto no comenzó</div>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {state.segments.length} momentos · {fmtMin(totalMin)}{" "}
+                      planificados
+                    </p>
+                    <Button
+                      size="lg"
+                      className="cns-btn-gold mt-4 h-14 px-10 text-lg"
+                      onClick={() => mutate((p) => start(p, Date.now()))}
+                    >
+                      <Play className="h-5 w-5" aria-hidden="true" /> Iniciar culto
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Reloj principal */}
+                    <div className="text-center">
+                      <div className="cns-timer-label">
+                        {phase === "overtime" ? "Excedente" : "Tiempo restante"}
+                      </div>
+                      <div
+                        className={cn(
+                          "cns-timer mt-1.5 text-7xl tabular-nums md:text-8xl",
+                          counterColor,
+                        )}
+                      >
+                        {live
+                          ? phase === "overtime"
+                            ? `+${fmtHMS(Math.floor(overtimeMs / 1000))}`
+                            : fmtHMS(Math.ceil(remaining / 1000))
+                          : "--:--"}
+                      </div>
+                      <div className="mt-1 text-sm text-muted-foreground">
+                        {phase === "overtime"
+                          ? "Tiempo cumplido — excedente"
+                          : `de ${seg?.minutes} min planificados`}
+                      </div>
+                    </div>
+
+                    {/* Medidor VU */}
+                    <Progress
+                      value={totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0}
+                      className={cn(
+                        "mt-4 h-3 bg-black/50",
+                        phase === "overtime"
+                          ? "[&>div]:bg-[#E2604F]"
+                          : phase === "warning"
+                            ? "[&>div]:bg-[#EAC97A]"
+                            : "[&>div]:bg-[#C6A45B]",
+                      )}
+                    />
+                    <div className="mt-1.5 flex items-center justify-between font-mono text-[10px] tracking-[0.18em] text-muted-foreground">
+                      <span>
+                        TRANSCURRIDO {fmtHMS(Math.floor(elapsed / 1000))}
+                      </span>
+                      <span>PLANIFICADO {seg?.minutes} MIN</span>
+                    </div>
+
+                    {phase === "overtime" ? (
+                      <div className="cns-alert-danger mt-3">
+                        <AlertTriangle
+                          className="h-4 w-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        Se cumplió el tiempo hace{" "}
+                        {fmtHMS(Math.floor(overtimeMs / 1000))}. Considerá pasar al
+                        siguiente momento.
+                      </div>
+                    ) : null}
+
+                    {/* Controles de la consola */}
+                    <div className="mt-5 grid grid-cols-2 gap-2.5">
+                      <Button
+                        size="lg"
+                        className={cn(
+                          "col-span-2 h-14 text-lg",
+                          state.status === "running"
+                            ? "cns-btn-line"
+                            : "cns-btn-gold",
+                        )}
+                        onClick={toggleStartPause}
+                      >
+                        {state.status === "running" ? (
+                          <>
+                            <Pause className="h-5 w-5" aria-hidden="true" /> Pausar
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-5 w-5" aria-hidden="true" />{" "}
+                            {state.elapsedBefore > 0 ? "Reanudar" : "Iniciar momento"}
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="cns-btn-line h-11"
+                        onClick={doReset}
+                      >
+                        <RotateCcw className="h-4 w-4" aria-hidden="true" /> Reiniciar
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="cns-btn-line h-11"
+                        onClick={doAdvance}
+                      >
+                        <SkipForward className="h-4 w-4" aria-hidden="true" />{" "}
+                        Siguiente
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="cns-btn-ghost h-10"
+                        onClick={() => adjustMinutes(-1)}
+                      >
+                        <Minus className="h-4 w-4" aria-hidden="true" /> 1 min
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="cns-btn-ghost h-10"
+                        onClick={() => adjustMinutes(1)}
+                      >
+                        <Plus className="h-4 w-4" aria-hidden="true" /> 1 min
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="cns-btn-ghost col-span-2 h-9"
+                        onClick={doBack}
+                      >
+                        <SkipBack className="h-4 w-4" aria-hidden="true" /> Momento
+                        anterior
+                      </Button>
+                    </div>
+
+                    {seg && seg.cards ? (
+                      <div className="mt-4 space-y-2.5 rounded-xl border-2 border-dashed border-[rgba(198,164,91,0.45)] bg-[rgba(198,164,91,0.06)] p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-xs font-bold uppercase tracking-[0.2em] text-[#E6D5A8]">
+                            Tarjeta en pantalla · editable
+                          </div>
+                          <Switch
+                            checked={!!seg.cards}
+                            onCheckedChange={(v) => updateSegment(seg.id, { cards: v })}
+                            aria-label="Desactivar la tarjeta grande en este momento"
+                          />
+                        </div>
+
+                        <div className="space-y-1.5">
+                          {seg.bullets.map((b, i) => (
+                            <div key={i} className="flex items-start gap-1.5">
+                              <Textarea
+                                value={b}
+                                rows={2}
+                                aria-label={`Editar punto ${i + 1}`}
+                                placeholder={`Punto ${i + 1}…`}
+                                className="cns-in min-h-0 flex-1 rounded-xl text-base font-bold leading-snug sm:text-lg"
+                                onChange={(e) => {
+                                  const arr = [...seg.bullets];
+                                  arr[i] = e.target.value;
+                                  updateSegment(seg.id, { bullets: arr });
+                                }}
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="cns-icobtn h-9 w-8 shrink-0"
+                                aria-label={`Quitar punto ${i + 1}`}
+                                disabled={seg.bullets.length <= 1}
+                                onClick={() =>
+                                  updateSegment(seg.id, {
+                                    bullets: seg.bullets.filter((_, j) => j !== i),
+                                  })
+                                }
+                              >
+                                <X className="h-4 w-4" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="cns-btn-line h-8"
+                            onClick={() =>
+                              updateSegment(seg.id, { bullets: [...seg.bullets, ""] })
+                            }
+                          >
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                            Agregar punto
+                          </Button>
+                        </div>
+
+                        <p className="text-xs text-muted-foreground">
+                          Una sola tarjeta por momento: lo que escribís acá se ve al
+                          instante en la pantalla, con letra gigante, todos los puntos
+                          juntos.
+                        </p>
+                      </div>
+                    ) : seg ? (
+                      <div className="mt-4 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[rgba(143,160,184,0.35)] bg-black/20 p-3">
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                            Tarjeta en pantalla
+                          </div>
+                          <p className="mt-0.5 text-xs leading-snug text-muted-foreground">
+                            ¿Este momento tiene avisos o puntos? Mostralos en una sola
+                            tarjeta, con letra grande (ideal para anuncios).
+                          </p>
+                        </div>
+                        <Switch
+                          checked={!!seg.cards}
+                          onCheckedChange={(v) => updateSegment(seg.id, { cards: v })}
+                          aria-label="Activar la tarjeta grande en este momento"
+                          className="shrink-0"
+                        />
+                      </div>
+                    ) : null}
+
+                    <p className="pt-3 text-center text-xs text-muted-foreground">
+                      Atajos: <span className="cns-kbd">Espacio</span> iniciar/pausar ·{" "}
+                      <span className="cns-kbd">N</span> siguiente ·{" "}
+                      <span className="cns-kbd">R</span> reiniciar
+                    </p>
+                  </>
+                )}
+              </div>
+            </section>
+
+            {/* ── Cronómetro general del culto ── */}
+            <section className="cns-panel cns-rise">
+              <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+                <div>
+                  <div className="cns-eyebrow">Cronómetro general</div>
+                  <div className="cns-timer mt-1.5 text-3xl text-[#E6D5A8]">
+                    {fmtMin(plannedRemain)}
+                  </div>
+                  <div className="mt-0.5 text-xs text-muted-foreground">
+                    Tiempo restante planificado
+                  </div>
+                </div>
+                <div className="flex max-w-[55%] flex-wrap justify-end gap-1.5">
+                  {upcoming.length === 0 ? (
+                    <span className="text-xs text-muted-foreground">
+                      Último momento
+                    </span>
+                  ) : (
+                    upcoming.map(({ x, i }) => (
+                      <span key={x.id} className="cns-tag">
+                        <span
+                          className={cn(
+                            "h-2 w-2 shrink-0 rounded-full",
+                            COLORS[x.color].dot,
+                          )}
+                          aria-hidden="true"
+                        />
+                        {i + 1}. {x.title} · {x.minutes} min
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          {/* ═══ Columna derecha ═══ */}
+          <div className="space-y-5">
+            {/* ── Monitor de salida (mini pantalla en vivo) ── */}
+            <section className="cns-panel cns-rise">
+              <div className="px-5 pt-4">
+                <div className="cns-eyebrow">Monitor de salida</div>
+                <h2 className="cns-h2 mt-1 flex items-center gap-2">
+                  <MonitorSpeaker
+                    className="h-4 w-4 shrink-0 text-[#C6A45B]"
+                    aria-hidden="true"
+                  />{" "}
+                  Pantalla del predicador
+                </h2>
+                <p className="cns-sub mt-0.5">
+                  Mini pantalla en vivo: se ve acá lo mismo que se proyecta ahora
+                  mismo. Tocala para abrirla en grande.
+                </p>
+              </div>
+              <div className="p-4">
+                <div
+                  title="Abrir la pantalla del predicador"
+                  onClick={openPreacherWindow}
+                  className="cns-bezel cursor-pointer"
+                >
+                  <MiniPantalla state={state} now={now} biblia={bibliaViva} />
+                </div>
+              </div>
+            </section>
+
+            {/* ── Mensajes al orador ── */}
+            <section className="cns-panel cns-rise">
+              <div className="px-5 pt-4">
+                <div className="cns-eyebrow">Intercomunicador</div>
+                <h2 className="cns-h2 mt-1 flex items-center gap-2">
+                  <MessageSquare
+                    className="h-4 w-4 shrink-0 text-[#C6A45B]"
+                    aria-hidden="true"
+                  />{" "}
+                  Mensajes al orador
+                </h2>
+                <p className="cns-sub mt-0.5">
+                  En la pantalla del predicador se ve SOLO el mensaje, gigante y sin
+                  leyendas
+                </p>
+              </div>
+              <div className="space-y-3 px-5 pb-5 pt-3">
+                <div className="flex gap-2">
+                  <Input
+                    aria-label="Mensaje personalizado"
+                    placeholder="Escribir mensaje…"
+                    value={msgDraft}
+                    className="cns-in"
+                    onChange={(e) => setMsgDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        sendMessage(msgDraft, msgUrgent);
+                        setMsgDraft("");
+                      }
+                    }}
+                  />
+                  <Button
+                    size="icon"
+                    aria-label="Enviar mensaje"
+                    className="cns-btn-gold h-10 w-10 shrink-0"
+                    onClick={() => {
+                      sendMessage(msgDraft, msgUrgent);
+                      setMsgDraft("");
+                    }}
+                  >
+                    <Send className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="msg-urgent"
+                    checked={msgUrgent}
+                    onCheckedChange={setMsgUrgent}
+                  />
+                  <Label htmlFor="msg-urgent" className="text-sm font-normal">
+                    Urgente (rojo, para llamar la atención)
+                  </Label>
+                </div>
+                <div className="cns-sep" />
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 text-xs text-muted-foreground">
+                    {state.message ? (
+                      <span className="line-clamp-2">
+                        En pantalla: <b>“{state.message.text}”</b>
+                      </span>
+                    ) : (
+                      "Sin mensaje en pantalla"
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="cns-btn-line h-8 shrink-0"
+                    disabled={!state.message}
+                    onClick={() => mutate((p) => ({ ...p, message: null }))}
+                  >
+                    <X className="h-3.5 w-3.5" aria-hidden="true" /> Limpiar
+                  </Button>
+                </div>
+              </div>
+            </section>
+
+            {/* ── Ajustes de la pantalla ── */}
+            <section className="cns-panel cns-rise">
+              <div className="px-5 pt-4">
+                <div className="cns-eyebrow">Configuración</div>
+                <h2 className="cns-h2 mt-1">Ajustes de la pantalla</h2>
+              </div>
+              <div className="space-y-4 px-5 pb-5 pt-3">
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="warning-min" className="text-sm font-normal">
+                    Aviso amarillo
+                  </Label>
+                  <Select
+                    value={String(state.settings.warningMin)}
+                    onValueChange={(v) => setSettings({ warningMin: Number(v) })}
+                  >
+                    <SelectTrigger id="warning-min" className="cns-in w-40">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="cns-pop">
+                      <SelectItem value="0">Sin aviso</SelectItem>
+                      <SelectItem value="1">1 min antes</SelectItem>
+                      <SelectItem value="2">2 min antes</SelectItem>
+                      <SelectItem value="3">3 min antes</SelectItem>
+                      <SelectItem value="5">5 min antes</SelectItem>
+                      <SelectItem value="10">10 min antes</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="set-blink" className="text-sm font-normal">
+                    Parpadear cuando el tiempo está cumplido
+                  </Label>
+                  <Switch
+                    id="set-blink"
+                    checked={state.settings.blink}
+                    onCheckedChange={(v) => setSettings({ blink: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="set-auto" className="text-sm font-normal">
+                    Auto-iniciar el siguiente momento
+                  </Label>
+                  <Switch
+                    id="set-auto"
+                    checked={state.settings.autoAdvance}
+                    onCheckedChange={(v) => setSettings({ autoAdvance: v })}
+                  />
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <Label htmlFor="set-bullets" className="text-sm font-normal">
+                    Mostrar puntos clave en modo contador
+                  </Label>
+                  <Switch
+                    id="set-bullets"
+                    checked={state.settings.showBulletsOnTimer}
+                    onCheckedChange={(v) => setSettings({ showBulletsOnTimer: v })}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Cada momento puede mostrarse en modo “Contador grande” o “Guion +
+                  contador abajo” (se cambia en la edición del momento).
+                </p>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+
+      {/* Editor de momento (modal) */}
+      <Dialog
+        open={!!editingSeg}
+        onOpenChange={(o) => {
+          if (!o) setEditingId(null);
+        }}
+      >
+        <DialogContent className="cns-modal max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar momento</DialogTitle>
+            <DialogDescription>
+              Los cambios se ven al instante en la pantalla del predicador.
+            </DialogDescription>
+          </DialogHeader>
+          {editingSeg ? (
+            <SegmentEditor
+              seg={editingSeg}
+              canDelete={state.segments.length > 1}
+              onUpdate={(patch) => updateSegment(editingSeg.id, patch)}
+              onDelete={() => {
+                removeSegment(editingSeg.id);
+                setEditingId(null);
+              }}
+              onJump={() => {
+                const idx = state.segments.findIndex((s) => s.id === editingSeg.id);
+                if (idx >= 0) mutate((p) => jumpTo(p, idx));
+                setEditingId(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
