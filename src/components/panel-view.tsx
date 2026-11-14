@@ -4,11 +4,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
-  BookOpen,
-  ChevronLeft,
-  ChevronRight,
   Clock,
-  EyeOff,
   HelpCircle,
   MessageSquare,
   Minus,
@@ -19,7 +15,6 @@ import {
   Plus,
   RotateCcw,
   Send,
-  Settings as SettingsIcon,
   SkipBack,
   SkipForward,
   Trash2,
@@ -76,13 +71,6 @@ import {
   useNow,
   useShowChannel,
 } from "@/lib/show";
-import {
-  BIBLIA_URL_DEFECTO,
-  VersoBiblia,
-  guardarUrlBiblia,
-  urlBibliaGuardada,
-  useBibliaSocket,
-} from "@/lib/biblia";
 import { VERSION_APP } from "@/lib/version";
 
 /* ═══════════════════════════════════════════════════════════════════════
@@ -257,6 +245,7 @@ const ESTILO_CONSOLA = `
 /* ── Menú de los tres puntitos ── */
 .cns-menu{
   position:absolute;top:calc(100% + 4px);right:2px;z-index:60;min-width:168px;
+  width:max-content;max-width:min(260px,92vw);
   border-radius:10px;border:1px solid var(--line-soft);background:#12233D;
   box-shadow:0 18px 40px rgba(2,6,14,.65);padding:4px;display:flex;flex-direction:column;
 }
@@ -365,25 +354,6 @@ const ESTILO_CONSOLA = `
 }
 `;
 
-/** Lee un texto de localStorage sin romperse si no está disponible. */
-function lsTexto(key: string): string {
-  try {
-    return localStorage.getItem(key) ?? "";
-  } catch {
-    return "";
-  }
-}
-
-/* Temas de fondo que difunde Biblia Sincronizada (los mismos ids que el admin). */
-const TEMAS_BIBLIA: { id: string; nombre: string }[] = [
-  { id: "claro", nombre: "Claro" },
-  { id: "doodle-claro", nombre: "Doodle claro" },
-  { id: "sepia", nombre: "Sepia" },
-  { id: "oscuro", nombre: "Oscuro" },
-  { id: "doodle-oscuro", nombre: "Doodle oscuro" },
-  { id: "azul", nombre: "Azul" },
-];
-
 export default function PanelView() {
   const { state, mutate, peerOnline, bibliaProyectada } = useShowChannel("panel");
   const now = useNow(500);
@@ -392,35 +362,6 @@ export default function PanelView() {
   const [msgUrgent, setMsgUrgent] = useState(false);
   const [menuIdx, setMenuIdx] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
-
-  /* ───────── Biblia Sincronizada: el panel también proyecta ─────────
-     Misma conexión que el admin del teléfono: el panel manda versículos,
-     citas y temas al mismo servidor, y la letra aparece en la proyección
-     y en la pantalla del predicador como si la mandara el teléfono. */
-  const [bibliaUrlConf, setBibliaUrlConf] = useState<string | null>(null);
-  const [confBibliaAbierta, setConfBibliaAbierta] = useState(false);
-  const [inputUrlBiblia, setInputUrlBiblia] = useState(BIBLIA_URL_DEFECTO);
-  const [refDraft, setRefDraft] = useState<string>(() => lsTexto("culto-biblia-ref"));
-  const [txtDraft, setTxtDraft] = useState<string>(() => lsTexto("culto-biblia-texto"));
-  const [citaDraft, setCitaDraft] = useState("");
-  const [temaBiblia, setTemaBiblia] = useState("");
-  /** Último versículo enviado: se reenvía con otra parte al avanzar/retroceder. */
-  const [versoActivo, setVersoActivo] = useState<VersoBiblia | null>(null);
-  useEffect(() => {
-    setBibliaUrlConf(urlBibliaGuardada());
-  }, []);
-  const urlBiblia = bibliaUrlConf ?? BIBLIA_URL_DEFECTO;
-  const biblia = useBibliaSocket(urlBiblia);
-  const bibliaConectado = biblia.estado === "conectado";
-  // El borrador sobrevive una recarga de la página a mitad del culto.
-  useEffect(() => {
-    try {
-      localStorage.setItem("culto-biblia-ref", refDraft);
-      localStorage.setItem("culto-biblia-texto", txtDraft);
-    } catch {
-      /* sin storage */
-    }
-  }, [refDraft, txtDraft]);
 
   /* ── Secuencia: arrastre con el cursor y rueda del mouse ── */
   const seqRef = useRef<HTMLDivElement | null>(null);
@@ -610,75 +551,6 @@ export default function PanelView() {
     const t = text.trim();
     if (!t) return;
     mutate((p) => ({ ...p, message: { id: uid(), text: t, urgent } }));
-  };
-
-  /* ─────────────── Acciones de Biblia Sincronizada ─────────────── */
-
-  /** Manda el versículo del borrador al servidor de Biblia Sincronizada.
-   *  La pantalla del predicador lo corta en partes y muestra la pedida. */
-  const proyectarVerso = (partePedida = 0) => {
-    const ref = refDraft.trim();
-    const texto = txtDraft.trim().replace(/\s+/g, " ");
-    if (!bibliaConectado || !ref || !texto) return;
-    const m = ref.match(/^(.+?)\s+(\d+)(?::(\d+))?(?:-(\d+))?$/);
-    const verso: VersoBiblia = {
-      bookName: m ? m[1] : ref,
-      chapter: m ? Number(m[2]) || 0 : 0,
-      verse: m && m[3] ? Number(m[3]) || 0 : 0,
-      version: "",
-      part: Math.max(0, Math.trunc(partePedida)),
-      bookNumber: null,
-      pid: Math.floor(Date.now() / 1000) % 100000,
-      words: texto.split(" "),
-      label: ref,
-    };
-    biblia.enviar({ type: "verse", ...verso });
-    setVersoActivo(verso);
-  };
-
-  /** Avanza o retrocede la parte del versículo en pantalla: reenvía el mismo
-   *  versículo con otra parte, igual que hacía el admin del teléfono. */
-  const cambiarParteBiblia = (delta: number) => {
-    if (!versoActivo) return;
-    const total = Math.max(1, bibliaProyectada?.totalPartes ?? 1);
-    const actual = Math.max(1, bibliaProyectada?.parte ?? 1);
-    const nueva = Math.min(total, Math.max(1, actual + delta));
-    if (nueva === actual) return;
-    const verso = { ...versoActivo, part: nueva - 1 };
-    biblia.enviar({ type: "verse", ...verso });
-    setVersoActivo(verso);
-  };
-
-  /** Texto libre (cita) en la proyección, con saltos de línea seguros. */
-  const proyectarCita = () => {
-    const t = citaDraft.trim();
-    if (!bibliaConectado || !t) return;
-    const esc = (s: string) =>
-      s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-    const html = t
-      .split(/\n+/)
-      .filter((l) => l.trim())
-      .map((l) => `<p>${esc(l.trim())}</p>`)
-      .join("");
-    biblia.enviar({ type: "freeText", html });
-  };
-
-  /** Oculta la letra en la proyección y en la pantalla del predicador. */
-  const ocultarBiblia = () => {
-    biblia.enviar({ type: "clear" });
-    setVersoActivo(null);
-  };
-
-  const enviarTemaBiblia = (fondo: string) => {
-    setTemaBiblia(fondo);
-    if (fondo) biblia.enviar({ type: "theme", fondo });
-  };
-
-  const guardarUrlBibliaPanel = () => {
-    const limpia = inputUrlBiblia.trim();
-    if (!limpia) return;
-    guardarUrlBiblia(limpia);
-    setBibliaUrlConf(limpia);
   };
 
   /* ────────────── Pantalla del predicador ────────────── */
@@ -1418,196 +1290,6 @@ export default function PanelView() {
                 </div>
               </div>
             </section>
-
-            {/* ── Biblia Sincronizada: el panel maneja la proyección ── */}
-            <section className="cns-panel cns-rise shrink-0">
-              <div className="flex flex-wrap items-center justify-between gap-2 px-4 pt-3">
-                <div className="cns-eyebrow">
-                  <BookOpen className="h-3.5 w-3.5" aria-hidden="true" /> Biblia
-                  sincronizada
-                </div>
-                <div className="flex items-center gap-1">
-                  <span
-                    className={cn(
-                      "cns-pill",
-                      biblia.estado === "conectado"
-                        ? "cns-pill-ok"
-                        : biblia.estado === "conectando"
-                          ? "cns-pill-dim"
-                          : "cns-pill-danger",
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        "cns-led",
-                        biblia.estado === "conectado" && "cns-led-ok",
-                        biblia.estado === "desconectado" && "cns-led-blink",
-                      )}
-                    />
-                    {biblia.estado === "conectado"
-                      ? "Conectada"
-                      : biblia.estado === "conectando"
-                        ? "Conectando…"
-                        : "Sin conexión"}
-                  </span>
-                  <button
-                    type="button"
-                    aria-label="Reintentar conexión de la biblia"
-                    title="Reintentar conexión"
-                    className="cns-icobtn grid h-7 w-7 place-items-center rounded-md"
-                    onClick={biblia.reintentar}
-                  >
-                    <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label="Cambiar el servidor de la biblia"
-                    title="Cambiar el servidor de la biblia"
-                    className={cn(
-                      "cns-icobtn grid h-7 w-7 place-items-center rounded-md",
-                      confBibliaAbierta &&
-                        "bg-[rgba(198,164,91,.16)] text-[#E6D5A8]",
-                    )}
-                    onClick={() => setConfBibliaAbierta((v) => !v)}
-                  >
-                    <SettingsIcon className="h-3.5 w-3.5" aria-hidden="true" />
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-1.5 px-4 pb-2 pt-2">
-                {confBibliaAbierta ? (
-                  <div className="flex gap-1.5">
-                    <Input
-                      aria-label="Dirección del servidor de Biblia Sincronizada"
-                      placeholder="Servidor (https://…)"
-                      value={inputUrlBiblia}
-                      className="cns-in h-8 min-w-0 flex-1 text-xs"
-                      onChange={(e) => setInputUrlBiblia(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter") guardarUrlBibliaPanel();
-                      }}
-                    />
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="cns-btn-line h-8 shrink-0"
-                      onClick={guardarUrlBibliaPanel}
-                    >
-                      Guardar
-                    </Button>
-                  </div>
-                ) : null}
-                <div className="flex gap-1.5">
-                  <Input
-                    aria-label="Referencia del versículo"
-                    placeholder="Referencia · ej.: Juan 3:16"
-                    value={refDraft}
-                    className="cns-in h-9 min-w-0 flex-1"
-                    onChange={(e) => setRefDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") proyectarVerso(0);
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    className="cns-btn-gold h-9 shrink-0"
-                    disabled={
-                      !bibliaConectado || !refDraft.trim() || !txtDraft.trim()
-                    }
-                    onClick={() => proyectarVerso(0)}
-                  >
-                    <BookOpen className="h-4 w-4" aria-hidden="true" /> Proyectar
-                  </Button>
-                </div>
-                <Textarea
-                  aria-label="Texto del versículo"
-                  placeholder="Texto del versículo: escribelo o pegalo acá…"
-                  value={txtDraft}
-                  rows={2}
-                  className="cns-in min-h-0 text-xs leading-snug"
-                  onChange={(e) => setTxtDraft(e.target.value)}
-                />
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="cns-btn-line h-8 w-8 shrink-0"
-                    aria-label="Parte anterior del versículo"
-                    title="Parte anterior"
-                    disabled={!versoActivo}
-                    onClick={() => cambiarParteBiblia(-1)}
-                  >
-                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                  <span className="min-w-0 flex-1 text-center text-xs text-muted-foreground">
-                    {bibliaViva && bibliaViva.totalPartes > 1
-                      ? `Parte ${bibliaViva.parte} de ${bibliaViva.totalPartes}`
-                      : bibliaViva
-                        ? "Versículo completo"
-                        : "—"}
-                  </span>
-                  <Button
-                    size="icon"
-                    variant="outline"
-                    className="cns-btn-line h-8 w-8 shrink-0"
-                    aria-label="Parte siguiente del versículo"
-                    title="Parte siguiente"
-                    disabled={!versoActivo}
-                    onClick={() => cambiarParteBiblia(1)}
-                  >
-                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="cns-btn-line h-8 shrink-0"
-                    disabled={!bibliaConectado}
-                    onClick={ocultarBiblia}
-                  >
-                    <EyeOff className="h-3.5 w-3.5" aria-hidden="true" /> Ocultar
-                  </Button>
-                </div>
-                <div className="cns-sep" />
-                <div className="flex gap-1.5">
-                  <Input
-                    aria-label="Cita libre"
-                    placeholder="Cita libre (texto en la pantalla)…"
-                    value={citaDraft}
-                    className="cns-in h-8 min-w-0 flex-1 text-xs"
-                    onChange={(e) => setCitaDraft(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") proyectarCita();
-                    }}
-                  />
-                  <Button
-                    size="icon"
-                    aria-label="Proyectar la cita libre"
-                    title="Proyectar cita"
-                    className="cns-btn-line h-8 w-8 shrink-0"
-                    disabled={!bibliaConectado || !citaDraft.trim()}
-                    onClick={proyectarCita}
-                  >
-                    <Send className="h-3.5 w-3.5" aria-hidden="true" />
-                  </Button>
-                  <Select value={temaBiblia} onValueChange={enviarTemaBiblia}>
-                    <SelectTrigger
-                      aria-label="Tema de fondo de la proyección"
-                      title="Tema de fondo de la proyección"
-                      className="cns-in h-8 w-[104px] shrink-0 text-xs"
-                    >
-                      <SelectValue placeholder="Tema" />
-                    </SelectTrigger>
-                    <SelectContent className="cns-pop">
-                      {TEMAS_BIBLIA.map((t) => (
-                        <SelectItem key={t.id} value={t.id}>
-                          {t.nombre}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              </div>
-            </section>
           </div>
         </div>
       </main>
@@ -1911,12 +1593,11 @@ function HelpDialog() {
         <ul className="space-y-1.5 text-xs text-muted-foreground">
           <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
           <li>
-            · Los versículos de <b>Biblia Sincronizada</b> se mandan desde el admin del
-            teléfono o desde el <b>panel</b> (sección <b>Biblia sincronizada</b>:
-            referencia + texto, partes ◀ ▶, cita libre, ocultar y temas de fondo).
-            Aparecen en vivo con el contador abajo, cortados en partes de 4 renglones
-            igual que la proyección: tocá el texto o usá ← → para cambiar de parte. El
-            servidor se cambia con el engranaje.
+            · Los versículos de <b>Biblia Sincronizada</b> (elegidos en su{" "}
+            <b>admin.html</b>) aparecen en vivo con el contador abajo, cortados en
+            partes de 4 renglones igual que la proyección: tocá el texto o usá ← →
+            para cambiar de parte. El servidor se cambia con el engranaje de esa
+            pantalla.
           </li>
           <li>
             · Los mensajes del operador también salen en esta pantalla, encima de
