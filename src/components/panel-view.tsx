@@ -1769,3 +1769,245 @@ function MiniPantalla({
               {biblia.ref}
               {biblia.version ? (
                 <span
+
+                  className="font-semibold tracking-normal text-amber-200/70"
+                  style={{ fontSize: 8 }}
+                >
+                  {" · "}
+                  {biblia.version}
+                </span>
+              ) : null}
+            </div>
+            {biblia.totalPartes > 1 ? (
+              <div
+                className="shrink-0 rounded-full border border-amber-300/40 bg-amber-300/10 px-1.5 font-bold text-amber-200"
+                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+              >
+                Parte {biblia.parte} de {biblia.totalPartes}
+              </div>
+            ) : null}
+          </div>
+          <div
+            className="mt-1 min-h-0 flex-1 overflow-hidden font-semibold leading-[1.28] text-white [&_em]:text-amber-200 [&_strong]:text-amber-200"
+            style={{ fontSize: 13 }}
+            dangerouslySetInnerHTML={{ __html: biblia.html }}
+          />
+        </div>
+        {active && seg ? (
+          <div className="shrink-0 px-4 pb-2">
+            <MiniBarra
+              seg={seg}
+              counterText={counterText}
+              counterColor={counterColor}
+              progressValue={progressValue}
+              progressClass={progressClass}
+              paused={paused}
+              grande
+            />
+          </div>
+        ) : null}
+      </div>
+    );
+  } else if (state.status === "finished") {
+    contenido = (
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <div className="font-bold text-white" style={{ fontSize: 16 }}>
+          Culto finalizado
+        </div>
+        <div className="mt-1 text-zinc-500" style={{ fontSize: 8 }}>
+          Reiniciá desde el panel para un nuevo culto.
+        </div>
+      </div>
+    );
+  } else if (!active) {
+    const first = state.segments[0];
+    contenido = (
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
+        <div className="font-bold leading-tight text-white" style={{ fontSize: 13 }}>
+          El culto comienza pronto
+        </div>
+        {first ? (
+          <div className="mt-1.5 text-zinc-400" style={{ fontSize: 8 }}>
+            Primer momento: <b>{first.title}</b> · {first.minutes} min
+          </div>
+        ) : null}
+      </div>
+    );
+  } else if (cardsOn && seg) {
+    // Tarjeta grande de avisos: todos los puntos juntos
+    const bullets = seg.bullets;
+    const fuente =
+      bullets.length <= 1 ? 30 : bullets.length <= 3 ? 21 : bullets.length <= 5 ? 15 : bullets.length <= 7 ? 11 : 9;
+    contenido = (
+      <div className="absolute inset-0 flex flex-col">
+        <div className="flex items-center gap-1.5 px-4 pt-3">
+          <span
+            className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COLORS[seg.color].dot)}
+          />
+          <div className="truncate font-bold text-zinc-200" style={{ fontSize: 9 }}>
+            {seg.title}
+          </div>
+          {paused ? (
+            <div
+              className="ml-auto shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
+              style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+            >
+              En pausa
+            </div>
+          ) : null}
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center px-3">
+          <div className="text-center font-bold leading-[1.3] text-white">
+            {bullets.map((b, i) => (
+              <div key={i} style={{ fontSize: fuente }}>
+                {b}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-4 py-2">
+          <MiniBarra
+            seg={seg}
+            counterText={counterText}
+            counterColor={counterColor}
+            progressValue={progressValue}
+            progressClass={progressClass}
+            paused={paused}
+          />
+        </div>
+      </div>
+    );
+  } else if (mode === "script" && seg) {
+    // Guion + contador abajo (si no hay guion, los puntos numerados)
+    const lineas = seg.script.split("\n").filter((l) => l.trim());
+    const nLineas = Math.max(1, lineas.length || seg.bullets.length || 1);
+    const fuente = Math.min(22, Math.max(8, ((60 / nLineas - 3.2) / 1.35) * 1.8));
+    contenido = (
+      <div className="absolute inset-0 flex flex-col">
+        <div className="px-4 pt-3">
+          <div className="flex items-center gap-1.5">
+            <span
+              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COLORS[seg.color].dot)}
+            />
+            <div className="truncate font-bold text-zinc-200" style={{ fontSize: 9 }}>
+              {seg.title}
+            </div>
+            {paused ? (
+              <div
+                className="ml-auto shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
+                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+              >
+                En pausa
+              </div>
+            ) : null}
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-hidden px-4 pt-2">
+          {lineas.length > 0 ? (
+            lineas.slice(0, 6).map((line, i) => (
+              <p
+                key={i}
+                className="mb-1.5 font-medium text-zinc-100"
+                style={{ fontSize: fuente, lineHeight: 1.35 }}
+              >
+                {line}
+              </p>
+            ))
+          ) : seg.bullets.length > 0 ? (
+            seg.bullets.slice(0, 6).map((b, i) => (
+              <p
+                key={i}
+                className="mb-1.5 font-bold text-zinc-100"
+                style={{ fontSize: Math.max(fuente, 10), lineHeight: 1.3 }}
+              >
+                {i + 1}. {b}
+              </p>
+            ))
+          ) : (
+            <p className="text-zinc-600" style={{ fontSize: 8 }}>
+              El guion de este momento está vacío.
+            </p>
+          )}
+        </div>
+        <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-4 py-2">
+          <MiniBarra
+            seg={seg}
+            counterText={counterText}
+            counterColor={counterColor}
+            progressValue={progressValue}
+            progressClass={progressClass}
+            paused={paused}
+          />
+        </div>
+      </div>
+    );
+  } else if (seg) {
+    // Contador grande
+    contenido = (
+      <div className="absolute inset-0 flex flex-col items-center justify-center px-3 pb-3 text-center">
+        <div className="font-bold tracking-wide text-zinc-200" style={{ fontSize: 10 }}>
+          {seg.title}
+        </div>
+        {paused ? (
+          <div
+            className="mt-1 rounded-full bg-amber-400 px-2 font-bold uppercase tracking-widest text-amber-950"
+            style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+          >
+            En pausa
+          </div>
+        ) : null}
+        <div
+          className={cn(
+            "mt-1 font-mono font-bold tabular-nums leading-none",
+            counterColor,
+          )}
+          style={{ fontSize: 52 }}
+        >
+          {counterText}
+        </div>
+        <div className="mt-2 w-3/4">
+          <Progress
+            value={progressValue}
+            className={cn("h-[3px] bg-white/10", progressClass)}
+          />
+        </div>
+        {state.settings.showBulletsOnTimer && seg.bullets.length > 0 ? (
+          <div className="absolute bottom-2 left-3 right-3 flex flex-wrap items-center justify-center gap-1">
+            {seg.bullets.slice(0, 3).map((b, i) => (
+              <span
+                key={i}
+                className={cn(
+                  "max-w-[45%] truncate rounded-full border px-1.5",
+                  COLORS[seg.color].chipDark,
+                )}
+                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
+              >
+                {b}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={ref}
+      className="relative w-full select-none overflow-hidden rounded-xl border-2 border-white/15 bg-black"
+      style={{ aspectRatio: "16 / 9" }}
+    >
+      <div
+        className="absolute left-0 top-0 origin-top-left"
+        style={{
+          width: MINI_ANCHO,
+          height: MINI_ALTO,
+          transform: scale > 0 ? `scale(${scale})` : undefined,
+          opacity: scale > 0 ? 1 : 0,
+        }}
+      >
+        {contenido}
+      </div>
+    </div>
+  );
+}
