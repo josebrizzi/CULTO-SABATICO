@@ -4,7 +4,10 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
+  Check,
   Clock,
+  Copy,
+  FileText,
   FolderOpen,
   HelpCircle,
   MessageSquare,
@@ -14,6 +17,7 @@ import {
   Pause,
   Play,
   Plus,
+  Printer,
   RotateCcw,
   Save,
   Send,
@@ -478,6 +482,170 @@ function tipoDeMomento(titulo: string): { label: string; tone: string } {
   return { label: "Momento", tone: "cns-tipo-general" };
 }
 
+/* ═══════════════════════════════════════════════════════════════════════
+   Hoja de Programa (v0.8.8) — la versión imprimible del culto, en una
+   ventana propia fuera del div .cns (por eso no usa las variables del
+   tema: define las suyas). En pantalla es una vista previa blanca; al
+   imprimir, un @media print esconde TODO lo demás y deja solo la hoja,
+   para que salga limpia en papel A4 o en "Guardar como PDF".
+   ═══════════════════════════════════════════════════════════════════════ */
+const ESTILO_HOJA = `
+.cns-hoja-portal{
+  --h-ink:#241E16; --h-ink2:#4A3E30; --h-mut:#8A7A64;
+  --h-oro:#B08D57; --h-line:#D8CDB6; --h-danger:#B0452F;
+  position:fixed; inset:0; z-index:70; overflow-y:auto;
+  background:rgba(36,30,22,.55);
+  font-family:'Lato','Segoe UI',system-ui,-apple-system,sans-serif;
+}
+.cns-hoja-col{ max-width:760px; margin:0 auto; padding:22px 14px 40px; }
+
+/* Barra de botones y campos editables (solo pantalla, nunca se imprime) */
+.cns-hoja-barra{
+  background:#FBF8F1; border:1px solid #E4DCCB; border-radius:14px;
+  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  padding:12px 16px; display:flex; flex-wrap:wrap; gap:10px 14px;
+  align-items:flex-start; color:#241E16;
+}
+.cns-hoja-barra-tit{
+  font-family:'Playfair Display',Georgia,serif; font-size:17px; font-weight:700;
+}
+.cns-hoja-barra-sub{
+  font-size:11.5px; color:#8A7A64; margin-top:2px; max-width:420px; line-height:1.5;
+}
+.cns-hoja-barra-btns{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+.cns-hoja-btn{
+  display:inline-flex; align-items:center; gap:6px; border-radius:999px;
+  padding:7px 14px; font-size:12px; font-weight:800; letter-spacing:.04em;
+  border:1px solid #E0D5BE; background:#FFFFFF; color:#241E16; cursor:pointer;
+}
+.cns-hoja-btn:hover{ background:#F6EFDD; }
+.cns-hoja-btn-gold{
+  display:inline-flex; align-items:center; gap:6px; border-radius:999px;
+  padding:7px 14px; font-size:12px; font-weight:800; letter-spacing:.04em;
+  border:none; color:#F5E9D2; cursor:pointer;
+  background:linear-gradient(150deg,#6B4A2F 0%,#3A2C1A 92%);
+  box-shadow:0 4px 12px rgba(58,44,26,.25);
+}
+.cns-hoja-btn-gold:hover{ filter:brightness(1.08); }
+.cns-hoja-campos{
+  display:flex; flex-wrap:wrap; gap:10px 14px;
+  background:rgba(251,248,241,.96); border:1px solid #E4DCCB;
+  border-radius:12px; padding:10px 16px; margin-top:10px; color:#241E16;
+}
+.cns-hoja-campos label{
+  display:flex; flex-direction:column; gap:3px;
+  font-size:10.5px; font-weight:800; letter-spacing:.14em;
+  text-transform:uppercase; color:#A3823F;
+}
+.cns-hoja-campos label.grow{ flex:1 1 220px; }
+.cns-hoja-campos input{
+  background:#fff; border:1px solid #E0D5BE; border-radius:8px;
+  padding:6px 10px; font-size:13px; color:#241E16;
+  font-family:'Lato',sans-serif; min-width:170px;
+}
+.cns-hoja-campos input:focus{ outline:2px solid rgba(176,141,87,.45); outline-offset:1px; }
+
+/* La hoja propiamente dicha: blanca, sobria, A4 */
+.cns-hoja{
+  background:#fff; border:1px solid #E4DCCB; border-radius:6px;
+  box-shadow:0 14px 40px rgba(0,0,0,.28);
+  padding:34px 38px; color:var(--h-ink); margin-top:14px;
+}
+.cns-hoja-iglesia{
+  text-align:center; font-size:9.5px; font-weight:700;
+  letter-spacing:.26em; text-transform:uppercase; color:var(--h-oro);
+}
+.cns-hoja-titulo{
+  font-family:'Playfair Display',Georgia,serif; font-size:30px; font-weight:700;
+  text-align:center; letter-spacing:.04em; text-transform:uppercase;
+  margin:10px 0 0; color:var(--h-ink); line-height:1.15;
+}
+.cns-hoja-linea{
+  width:64px; height:2px; margin:10px auto 0;
+  background:var(--h-oro);
+}
+.cns-hoja-evento{
+  text-align:center; font-size:14.5px; font-weight:700;
+  color:var(--h-ink2); margin-top:10px;
+}
+.cns-hoja-fecha{ text-align:center; font-size:12.5px; color:var(--h-mut); margin-top:2px; }
+.cns-hoja-nota{
+  text-align:center; font-size:12px; color:var(--h-ink2);
+  font-style:italic; margin-top:4px;
+}
+.cns-hoja-tabla{ width:100%; border-collapse:collapse; margin-top:18px; }
+.cns-hoja-tabla th{
+  text-align:left; font-size:9.5px; letter-spacing:.18em; text-transform:uppercase;
+  color:var(--h-mut); border-bottom:2px solid var(--h-ink);
+  padding:6px 8px 7px 0; font-weight:800;
+}
+.cns-hoja-tabla td{
+  padding:7px 8px 7px 0; border-bottom:1px solid var(--h-line);
+  vertical-align:top; font-size:13px; color:var(--h-ink);
+}
+.cns-hoja-hora{
+  font-family:'Roboto Mono',ui-monospace,monospace; font-weight:600;
+  white-space:nowrap; color:var(--h-ink2);
+}
+.cns-hoja-num{
+  width:26px; color:var(--h-mut);
+  font-family:'Roboto Mono',ui-monospace,monospace;
+}
+.cns-hoja-momento b{ font-size:13.5px; font-weight:700; }
+.cns-hoja-momento small{
+  display:block; font-size:10.5px; color:var(--h-mut); margin-top:1px;
+}
+.cns-hoja-min{
+  font-family:'Roboto Mono',ui-monospace,monospace;
+  text-align:right; white-space:nowrap;
+}
+.cns-hoja-vacio{ color:var(--h-mut); font-style:italic; padding:18px 0; }
+.cns-hoja-pie{
+  margin-top:16px; padding-top:10px; border-top:2px solid var(--h-ink);
+  font-family:'Roboto Mono',ui-monospace,monospace; font-size:12.5px;
+  font-weight:600; color:var(--h-ink2); text-align:center;
+}
+.cns-hoja-alerta{
+  margin-top:8px; text-align:center; font-size:11.5px;
+  font-weight:700; color:var(--h-danger);
+}
+
+/* Texto para WhatsApp / SMS */
+.cns-hoja-txt{
+  margin-top:14px; background:#FBF8F1; border:1px solid #E4DCCB;
+  border-radius:12px; padding:12px 16px 14px; color:#241E16;
+}
+.cns-hoja-txt-tit{
+  font-size:10.5px; font-weight:900; letter-spacing:.22em;
+  text-transform:uppercase; color:#A3823F;
+}
+.cns-hoja-txt-area{
+  margin-top:8px; width:100%; background:#fff; border:1px solid #E0D5BE;
+  border-radius:10px; padding:10px 12px;
+  font-family:'Roboto Mono',ui-monospace,monospace; font-size:12px;
+  line-height:1.55; color:#241E16; resize:vertical; white-space:pre;
+}
+
+/* ── Impresión: solo la hoja, limpia, con márgenes de A4 ── */
+@media print{
+  body{ background:#fff !important; }
+  body > *:not(.cns-hoja-portal){ display:none !important; }
+  .cns-hoja-portal{
+    position:static !important; background:none !important;
+    overflow:visible !important; padding:0 !important;
+  }
+  .cns-hoja-col{ max-width:none !important; margin:0 !important; padding:0 !important; }
+  .cns-hoja-barra, .cns-hoja-campos, .cns-hoja-txt{ display:none !important; }
+  .cns-hoja{
+    border:none !important; border-radius:0 !important;
+    box-shadow:none !important; margin:0 !important; padding:0 !important;
+  }
+  .cns-hoja-tabla tr{ break-inside:avoid; }
+  .cns-hoja-portal *{ -webkit-print-color-adjust:exact; print-color-adjust:exact; }
+}
+@page{ size:A4 portrait; margin:16mm 15mm; }
+`;
+
 /* ────────────────── Franja horaria (utilidades) ────────────────── */
 
 /** "09:30" → 570 (minutos desde medianoche); null si el dato no es válido. */
@@ -494,6 +662,17 @@ function minDeHora(hhmm: string): number | null {
 function fmtHora(min: number): string {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
   return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+/** La fecha de hoy en largo y en español: "Sábado, 15 de noviembre de 2025". */
+function fechaLargaHoy(): string {
+  const s = new Intl.DateTimeFormat("es-AR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+  return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
 /** Un programa guardado: los momentos de un tipo de culto con su franja horaria. */
@@ -1011,6 +1190,77 @@ export default function PanelView() {
 
   const editingSeg = state.segments.find((x) => x.id === editingId) ?? null;
 
+  /* ── Hoja de programa (v0.8.8): la versión imprimible del culto — papel o
+        "Guardar como PDF" — y el texto plano para pegar en WhatsApp o SMS.
+        Se genera en vivo con los momentos cargados y la franja horaria:
+        si mañana cambia un minuto, la próxima hoja ya sale corregida. ── */
+  const [hojaOpen, setHojaOpen] = useState(false);
+  const [hojaEvento, setHojaEvento] = useState("Culto sabático");
+  const [hojaFecha, setHojaFecha] = useState("");
+  const [hojaNota, setHojaNota] = useState("");
+  const [hojaCopiado, setHojaCopiado] = useState(false);
+
+  /* Al abrir la hoja la fecha vuelve a ser la de hoy; se puede corregir a
+     mano antes de imprimir (ej.: preparar la hoja con anticipación) */
+  useEffect(() => {
+    if (hojaOpen) setHojaFecha(fechaLargaHoy());
+  }, [hojaOpen]);
+
+  /* El texto del programa, línea por línea, para WhatsApp / SMS */
+  const textoHoja = useMemo(() => {
+    const lineas: string[] = [];
+    lineas.push(
+      `PROGRAMA DEL CULTO${hojaEvento.trim() ? ` — ${hojaEvento.trim()}` : ""}`,
+    );
+    if (hojaFecha.trim()) lineas.push(hojaFecha.trim());
+    if (hojaNota.trim()) lineas.push(hojaNota.trim());
+    lineas.push("");
+    if (state.segments.length === 0) {
+      lineas.push("(Todavía no hay momentos cargados en el panel.)");
+    } else {
+      state.segments.forEach((x, i) => {
+        const resp = x.speaker.trim();
+        lineas.push(
+          `${fmtHora(inicios[i])} ${i + 1}. ${x.title} (${x.minutes} min)` +
+            (resp ? ` — ${resp}` : ""),
+        );
+      });
+      lineas.push("");
+      lineas.push(
+        `Inicio ${fmtHora(inicioMin)} · Fin estimado ${fmtHora(finPlanMin)} · Total ${fmtMin(totalMin)}`,
+      );
+      if (finPlanMin > limiteMin) {
+        lineas.push(
+          `Ojo: se pasa ${finPlanMin - limiteMin} min del límite de las ${fmtHora(limiteMin)}.`,
+        );
+      }
+    }
+    return lineas.join("\n");
+  }, [
+    state.segments,
+    inicios,
+    inicioMin,
+    finPlanMin,
+    totalMin,
+    limiteMin,
+    hojaEvento,
+    hojaFecha,
+    hojaNota,
+  ]);
+
+  const copiarTextoHoja = async () => {
+    try {
+      await navigator.clipboard.writeText(textoHoja);
+      setHojaCopiado(true);
+      window.setTimeout(() => setHojaCopiado(false), 2500);
+    } catch {
+      window.prompt(
+        "El navegador no dejó copiar solo: seleccioná el texto de abajo y copialo con Ctrl+C.",
+        textoHoja,
+      );
+    }
+  };
+
   /* Estado del guardado en el servidor, para la píldora de Programas */
   const nubePill =
     nubeEstado === "ok"
@@ -1085,6 +1335,175 @@ export default function PanelView() {
   return (
     <div className="cns flex h-dvh flex-col overflow-hidden">
       <style dangerouslySetInnerHTML={{ __html: ESTILO_CONSOLA }} />
+
+      {/* ═══ Hoja de programa (v0.8.8): vista previa, impresión y texto.
+             Se renderiza en un portal FUERA del div .cns: al imprimir,
+             un @media print esconde todo lo demás y deja solo la hoja. ═══ */}
+      {hojaOpen
+        ? createPortal(
+            <div
+              className="cns-hoja-portal"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Hoja de programa imprimible"
+              onClick={() => setHojaOpen(false)}
+            >
+              <style dangerouslySetInnerHTML={{ __html: ESTILO_HOJA }} />
+              <div className="cns-hoja-col" onClick={(e) => e.stopPropagation()}>
+                <div className="cns-hoja-barra">
+                  <div className="min-w-0">
+                    <div className="cns-hoja-barra-tit">Hoja de programa</div>
+                    <p className="cns-hoja-barra-sub">
+                      Corregí el evento, la fecha o la nota si hace falta y tocá{" "}
+                      <b>Imprimir</b>: en la ventana del navegador elegí la
+                      impresora o <b>“Guardar como PDF”</b>. Podés imprimirla las
+                      veces que quieras: siempre sale con el culto cargado en este
+                      momento. Abajo, el <b>texto para WhatsApp / SMS</b>.
+                    </p>
+                  </div>
+                  <div className="cns-hoja-barra-btns">
+                    <button
+                      type="button"
+                      className="cns-hoja-btn"
+                      onClick={() => void copiarTextoHoja()}
+                    >
+                      {hojaCopiado ? (
+                        <Check className="h-3.5 w-3.5" aria-hidden="true" />
+                      ) : (
+                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                      )}
+                      {hojaCopiado ? "¡Copiado!" : "Copiar texto"}
+                    </button>
+                    <button
+                      type="button"
+                      className="cns-hoja-btn-gold"
+                      onClick={() => window.print()}
+                    >
+                      <Printer className="h-3.5 w-3.5" aria-hidden="true" /> Imprimir
+                    </button>
+                    <button
+                      type="button"
+                      className="cns-hoja-btn"
+                      onClick={() => setHojaOpen(false)}
+                    >
+                      <X className="h-3.5 w-3.5" aria-hidden="true" /> Cerrar
+                    </button>
+                  </div>
+                </div>
+                <div className="cns-hoja-campos">
+                  <label>
+                    <span>Evento</span>
+                    <input
+                      value={hojaEvento}
+                      onChange={(e) => setHojaEvento(e.target.value)}
+                      aria-label="Nombre del evento que sale en la hoja"
+                      title="Ej.: Culto sabático, Culto de comunión, Evangelismo"
+                    />
+                  </label>
+                  <label>
+                    <span>Fecha</span>
+                    <input
+                      value={hojaFecha}
+                      onChange={(e) => setHojaFecha(e.target.value)}
+                      aria-label="Fecha que sale en la hoja"
+                      title="Sale con la fecha de hoy; corregila a mano si la hoja es para otro día"
+                    />
+                  </label>
+                  <label className="grow">
+                    <span>Nota (opcional, ej.: Santa Cena)</span>
+                    <input
+                      value={hojaNota}
+                      onChange={(e) => setHojaNota(e.target.value)}
+                      aria-label="Nota opcional que sale en la hoja"
+                    />
+                  </label>
+                </div>
+                {/* La hoja que se imprime */}
+                <div className="cns-hoja">
+                  <div className="cns-hoja-iglesia">
+                    Iglesia Adventista del Séptimo Día · José C. Paz Centro
+                  </div>
+                  <h1 className="cns-hoja-titulo">Programa del culto</h1>
+                  <div className="cns-hoja-linea" aria-hidden="true" />
+                  <div className="cns-hoja-evento">
+                    {hojaEvento.trim() || "Culto"}
+                  </div>
+                  {hojaFecha.trim() ? (
+                    <div className="cns-hoja-fecha">{hojaFecha.trim()}</div>
+                  ) : null}
+                  {hojaNota.trim() ? (
+                    <div className="cns-hoja-nota">{hojaNota.trim()}</div>
+                  ) : null}
+                  <table className="cns-hoja-tabla">
+                    <thead>
+                      <tr>
+                        <th>Hora</th>
+                        <th>#</th>
+                        <th>Momento</th>
+                        <th>Min</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {state.segments.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="cns-hoja-vacio">
+                            Todavía no hay momentos cargados en el panel: cargá la
+                            plantilla o los programas guardados.
+                          </td>
+                        </tr>
+                      ) : (
+                        state.segments.map((x, i) => {
+                          const resp = x.speaker.trim();
+                          return (
+                            <tr key={x.id}>
+                              <td className="cns-hoja-hora">
+                                {fmtHora(inicios[i])}
+                              </td>
+                              <td className="cns-hoja-num">{i + 1}</td>
+                              <td className="cns-hoja-momento">
+                                <b>{x.title}</b>
+                                <small>
+                                  {tipoDeMomento(x.title).label}
+                                  {resp ? ` · ${resp}` : ""}
+                                </small>
+                              </td>
+                              <td className="cns-hoja-min">{x.minutes}</td>
+                            </tr>
+                          );
+                        })
+                      )}
+                    </tbody>
+                  </table>
+                  <div className="cns-hoja-pie">
+                    Inicio {fmtHora(inicioMin)} · Fin estimado{" "}
+                    {fmtHora(finPlanMin)} · Total {fmtMin(totalMin)}
+                  </div>
+                  {finPlanMin > limiteMin ? (
+                    <div className="cns-hoja-alerta">
+                      El programa se pasa {finPlanMin - limiteMin} min del límite de
+                      las {fmtHora(limiteMin)}.
+                    </div>
+                  ) : null}
+                </div>
+                {/* Texto plano para WhatsApp / SMS */}
+                <div className="cns-hoja-txt">
+                  <div className="cns-hoja-txt-tit">
+                    Texto para WhatsApp / SMS — tocá “Copiar texto” y pegalo en el
+                    mensaje
+                  </div>
+                  <textarea
+                    className="cns-hoja-txt-area"
+                    readOnly
+                    rows={Math.min(14, state.segments.length + 6)}
+                    value={textoHoja}
+                    onFocus={(e) => e.currentTarget.select()}
+                  />
+                </div>
+              </div>
+            </div>,
+            document.body,
+          )
+        : null}
 
       {/* Clic afuera cierra el menú de los tres puntitos */}
       {menuIdx !== null ? (
@@ -1177,6 +1596,17 @@ export default function PanelView() {
             <Button size="sm" className="cns-btn-gold" onClick={openPreacherWindow}>
               <MonitorSpeaker className="h-4 w-4" aria-hidden="true" />
               <span className="hidden sm:inline">Abrir pantalla del predicador</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="cns-btn-ghost"
+              title="Hoja imprimible del programa: papel o PDF, y texto para WhatsApp"
+              aria-label="Hoja de programa imprimible"
+              onClick={() => setHojaOpen(true)}
+            >
+              <FileText className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden md:inline">Programa</span>
             </Button>
             <HelpDialog />
           </div>
@@ -2293,6 +2723,15 @@ function HelpDialog() {
             (mañana, evangelismo, jóvenes, oración): configurá los momentos y las
             horas, guardalo con un nombre y cargalo cuando lo necesites. Siempre
             queda editable: cambiás minutos y horas igual que antes.
+          </li>
+          <li>
+            · El botón <b>Programa</b> (arriba, a la derecha) abre la{" "}
+            <b>hoja imprimible</b> del culto: cada momento con su horario, número,
+            tipo y minutos, y el responsable debajo del título. Corregí el{" "}
+            <b>evento</b>, la <b>fecha</b> y la <b>nota</b>, y tocá <b>Imprimir</b>{" "}
+            — en la ventana del navegador elegí la impresora o{" "}
+            <b>“Guardar como PDF”</b>. Abajo está el <b>texto para WhatsApp</b> con
+            el mismo programa, listo para copiar y pegar al pastor y a los hermanos.
           </li>
           <li>
             · Los programas se guardan <b>en el servidor</b>, no solo en la compu:{" "}
