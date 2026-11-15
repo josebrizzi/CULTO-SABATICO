@@ -685,6 +685,57 @@ type ProgramaGuardado = {
   creado: number;
 };
 
+/* ──────────── Fusión de listas de programas (local + nube) ────────────
+   (v0.8.9) Antes la lista que venía del servidor REEMPLAZABA la de esta
+   computadora al abrir la página: si el servidor respondía con datos viejos
+   (tiene caché), fallaba la subida o tardaba en contestar, los cultos
+   guardados acá desaparecían o volvían a una versión anterior, y la carga
+   se veía trabada. Ahora la nube NUNCA pisa lo local: se fusionan las dos. */
+
+/** Clave de identidad de un programa: su nombre sin importar mayúsculas,
+    acentos ni espacios de sobra — así "Culto de jóvenes" guardado en una
+    computadora y "culto de jovenes" tipeado en otra son el mismo culto. */
+export function claveProg(nombre: string): string {
+  return nombre
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
+ * Fusiona la lista de esta computadora con la que vino del servidor, sin
+ * perder nada:
+ * - lo que solo está en una de las dos, aparece;
+ * - si el mismo nombre está en las dos, gana el guardado más nuevo (creado);
+ * - las bajas anotadas en esta computadora se respetan: un programa borrado
+ *   acá no vuelve por una copia vieja que siga en el servidor.
+ */
+export function fusionarProgramas(
+  local: ProgramaGuardado[],
+  deNube: ProgramaGuardado[],
+  bajas: Record<string, number> = {},
+): ProgramaGuardado[] {
+  const porClave = new Map<string, ProgramaGuardado>();
+  for (const p of [...local, ...deNube]) {
+    const k = claveProg(p.nombre);
+    if (!k) continue;
+    if (k in bajas && (bajas[k] ?? 0) >= (p.creado ?? 0)) continue;
+    const previo = porClave.get(k);
+    if (!previo || (p.creado ?? 0) >= (previo.creado ?? 0)) porClave.set(k, p);
+  }
+  return [...porClave.values()].sort((a, b) => (b.creado ?? 0) - (a.creado ?? 0));
+}
+
+/** Huella de una lista (nombre + fecha de cada programa) para saber si dos
+    listas traen lo mismo sin comparar todo el contenido. */
+export function firmaProgramas(lista: ProgramaGuardado[]): string {
+  return lista
+    .map((p) => `${claveProg(p.nombre)}|${p.creado ?? 0}`)
+    .sort()
+    .join(",");
+}
+
 export default function PanelView() {
   const { state, mutate, peerOnline } = useShowChannel("panel");
   const now = useNow(500);
@@ -754,9 +805,16 @@ export default function PanelView() {
   /* ── Nube: los programas también se guardan en un servidor, con un
         código de sincronización. Así la lista no queda atrapada en una
         computadora: en otra máquina se pega el mismo código y aparecen
-        los mismos programas. Sin internet, queda la copia local. ── */
+        los mismos programas. Sin internet, queda la copia local.
+        (v0.8.9) Lo de esta computadora SIEMPRE manda: el servidor agrega y
+        respalda, pero jamás borra ni pisa lo guardado acá, y toda conexión
+        tiene límite de tiempo para no trabar la app. ── */
   const NUBE_URL = "https://textdb.dev/api/data/";
   const NUBE_LSK = "culto-nube-v1";
+  /** Bajas anotadas: por qué programas borrados acá no dejan volver copias
+      viejas que sigan en el servidor (clave = nombre, valor = fecha en ms). */
+  const NUBE_BAJAS_LSK = "culto-programas-bajas-v1";
+  const NUBE_TIMEOUT = 8000;
   const [nubeCodigo, setNubeCodigo] = useState<string | null>(null);
   const [nubeEstado, setNubeEstado] = useState<
     "ok" | "conectando" | "sinconexion" | "local"
@@ -775,10 +833,48 @@ export default function PanelView() {
         )
       : [];
 
+  const leerBajas = (): Record<string, number> => {
+    try {
+      return JSON.parse(localStorage.getItem(NUBE_BAJAS_LSK) ?? "{}") as Record<
+        string,
+        number
+      >;
+    } catch {
+      return {};
+    }
+  };
+
+  const anotarBaja = (nombre: string) => {
+    try {
+      const bajas = leerBajas();
+      bajas[claveProg(nombre)] = Date.now();
+      localStorage.setItem(NUBE_BAJAS_LSK, JSON.stringify(bajas));
+    } catch {
+      /* sin almacenamiento: la baja vale solo para esta sesión */
+    }
+  };
+
+  /** Fetch al servidor con límite de tiempo: si en 8 segundos no contesta,
+      se corta y sigue con la copia local (la app nunca queda esperando). */
+  const fetchNube = async (codigo: string, opciones?: RequestInit) => {
+    const ctrl = new AbortController();
+    const id = window.setTimeout(() => ctrl.abort(), NUBE_TIMEOUT);
+    try {
+      /* El ?t= de más es para que el servidor no conteste con una copia
+         guardada en su caché: siempre pedimos el dato fresco. */
+      return await fetch(
+        `${NUBE_URL}${encodeURIComponent(codigo)}?t=${Date.now()}`,
+        { ...opciones, cache: "no-store", signal: ctrl.signal },
+      );
+    } finally {
+      window.clearTimeout(id);
+    }
+  };
+
   const pushANube = async (codigo: string, lista: ProgramaGuardado[]) => {
     setNubeEstado("conectando");
     try {
-      await fetch(`${NUBE_URL}${encodeURIComponent(codigo)}`, {
+      await fetchNube(codigo, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
         body: JSON.stringify({ app: "culto-tiempos", v: 1, programas: lista }),
@@ -792,31 +888,42 @@ export default function PanelView() {
   const cargarDeNube = async (codigo: string): Promise<boolean> => {
     setNubeEstado("conectando");
     try {
-      const r = await fetch(`${NUBE_URL}${encodeURIComponent(codigo)}`, {
-        cache: "no-store",
-      });
+      const r = await fetchNube(codigo);
       if (!r.ok) throw new Error(`HTTP ${r.status}`);
       const txt = (await r.text()).trim();
+      /* Lo que hay en esta computadora: la base de la fusión */
+      let local: ProgramaGuardado[] = [];
+      try {
+        local = validarProgramas(
+          JSON.parse(localStorage.getItem("culto-programas-v1") ?? "[]"),
+        );
+      } catch {
+        local = [];
+      }
       if (!txt) {
         /* Código nuevo, todavía vacío en el servidor: se sube lo que haya acá */
         setNubeEstado("ok");
-        const local = validarProgramas(
-          (() => {
-            try {
-              return JSON.parse(localStorage.getItem("culto-programas-v1") ?? "[]");
-            } catch {
-              return [];
-            }
-          })(),
-        );
         if (local.length > 0) await pushANube(codigo, local);
         return true;
       }
-      const data = JSON.parse(txt) as { programas?: unknown };
-      if (Array.isArray(data?.programas)) {
-        setProgramas(validarProgramas(data.programas));
+      let deNube: ProgramaGuardado[] = [];
+      try {
+        const data = JSON.parse(txt) as { programas?: unknown };
+        deNube = validarProgramas(data?.programas);
+      } catch {
+        /* Respuesta corrupta: vale más ignorarla que pisar la lista local */
+        throw new Error("respuesta corrupta");
       }
       setNubeEstado("ok");
+      /* LO IMPORTANTE (v0.8.9): se fusiona, no se reemplaza. Los cultos que
+         solo están acá quedan, los que solo están en el servidor aparecen, y
+         si el mismo nombre está en los dos, gana el guardado más nuevo. */
+      const fusion = fusionarProgramas(local, deNube, leerBajas());
+      setProgramas(fusion);
+      /* Si al servidor le faltaba algo, se le manda la lista al día */
+      if (firmaProgramas(deNube) !== firmaProgramas(fusion)) {
+        await pushANube(codigo, fusion);
+      }
       return true;
     } catch {
       setNubeEstado("sinconexion");
@@ -1068,13 +1175,24 @@ export default function PanelView() {
       color: (x.color || COLOR_KEYS[i % COLOR_KEYS.length]) as ColorKey,
     }));
     mutate((p) => ({ ...resetService(p), segments: arr }));
-    setFranja({ inicio: pr.inicio, limite: pr.limite });
+    /* Programas viejos podían no traer franja horaria: si falta o no es una
+       hora válida, queda la que ya estaba en el panel en vez de vaciarse */
+    const iniOk = minDeHora(String(pr.inicio ?? "")) !== null;
+    const limOk = minDeHora(String(pr.limite ?? "")) !== null;
+    setFranja({
+      inicio: iniOk ? String(pr.inicio) : franja.inicio,
+      limite: limOk ? String(pr.limite) : franja.limite,
+    });
     setProgOpen(false);
   };
 
   const borrarPrograma = (id: string) => {
     if (window.confirm("¿Eliminar este programa guardado?")) {
+      const pr = programas.find((y) => y.id === id);
       const lista = programas.filter((y) => y.id !== id);
+      /* La baja queda anotada: si el servidor todavía tiene una copia vieja
+         de este programa, no vuelve a aparecer al recargar la página */
+      if (pr) anotarBaja(pr.nombre);
       setProgramas(lista);
       if (nubeCodigoRef.current) void pushANube(nubeCodigoRef.current, lista);
     }
@@ -2284,9 +2402,10 @@ export default function PanelView() {
             <DialogTitle>Programas guardados</DialogTitle>
             <DialogDescription>
               Guardá los tiempos de cada tipo de culto (mañana, evangelismo, jóvenes,
-              oración…) y cargalos cuando quieras: después los ajustás en vivo. Todo
-              viaja a un <b>servidor</b>: con el código, la misma lista aparece en
-              cualquier computadora.
+              oración…) y cargalos cuando quieras: después los ajustás en vivo. Los
+              programas también viajan a un <b>servidor</b> como respaldo: con el
+              código, la misma lista aparece en cualquier computadora. Lo guardado
+              en esta computadora <b>siempre manda</b>.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
@@ -2371,11 +2490,13 @@ export default function PanelView() {
                 </Button>
               </div>
               <p className="text-[11px] leading-snug text-muted-foreground">
-                Cada vez que guardás o borrás un programa, el cambio va al servidor
-                enseguida. En otra computadora: abrí esta página, tocá{" "}
-                <b>Programas</b>, pegá el mismo código y tocá <b>Conectar</b> —
-                aparece la misma lista. Si no hay internet, queda guardado en esta
-                computadora nomás.
+                Lo que está en esta computadora <b>manda siempre</b>: el servidor
+                agrega y respalda, pero nunca borra ni pisa lo guardado acá. Al
+                abrir la página se <b>fusionan</b> las dos listas sin perder nada,
+                y si al servidor le falta algo, se lo manda esta computadora
+                solita. En otra computadora: abrí esta página, tocá{" "}
+                <b>Programas</b>, pegá el mismo código y tocá <b>Conectar</b>. Si
+                no hay internet, queda guardado en esta computadora nomás.
               </p>
             </div>
             <div className="cns-sep" />
