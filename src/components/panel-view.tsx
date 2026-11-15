@@ -1079,3 +1079,1251 @@ export default function PanelView() {
       </span>
     );
   })();
+
+  /* ─────────────────────────── Render ───────────────────────── */
+
+  return (
+    <div className="cns flex h-dvh flex-col overflow-hidden">
+      <style dangerouslySetInnerHTML={{ __html: ESTILO_CONSOLA }} />
+
+      {/* Clic afuera cierra el menú de los tres puntitos */}
+      {menuIdx !== null ? (
+        <div
+          className="fixed inset-0 z-40"
+          aria-hidden="true"
+          onClick={() => setMenuIdx(null)}
+        />
+      ) : null}
+
+      {/* ═══ Barra superior de la consola ═══ */}
+      <header className="cns-top">
+        <div className="cns-top-in">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="cns-logo">
+              <Clock className="h-5 w-5" aria-hidden="true" />
+            </div>
+            <div className="min-w-0">
+              <div className="cns-iglesia truncate">
+                Iglesia Adventista del Séptimo Día · José C. Paz Centro
+              </div>
+              <div className="cns-titulo">Tiempos del Culto</div>
+            </div>
+          </div>
+          <div className="ml-auto flex flex-wrap items-center justify-end gap-x-3 gap-y-1.5">
+            {/* Ajustes de la pantalla, en línea (antes eran una columna) */}
+            <div
+              className="flex flex-wrap items-center gap-x-2.5 gap-y-1"
+              title="Ajustes de la pantalla del predicador"
+            >
+              <span className="cns-setlab">Pantalla</span>
+              <Select
+                value={String(state.settings.warningMin)}
+                onValueChange={(v) => setSettings({ warningMin: Number(v) })}
+              >
+                <SelectTrigger
+                  aria-label="Minutos del aviso amarillo"
+                  title="Aviso amarillo antes de que se cumpla el tiempo"
+                  className="cns-in h-8 w-[112px] text-xs"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="cns-pop">
+                  <SelectItem value="0">Sin aviso</SelectItem>
+                  <SelectItem value="1">1 min antes</SelectItem>
+                  <SelectItem value="2">2 min antes</SelectItem>
+                  <SelectItem value="3">3 min antes</SelectItem>
+                  <SelectItem value="5">5 min antes</SelectItem>
+                  <SelectItem value="10">10 min antes</SelectItem>
+                </SelectContent>
+              </Select>
+              <Switch
+                id="set-blink"
+                checked={state.settings.blink}
+                onCheckedChange={(v) => setSettings({ blink: v })}
+                aria-label="Parpadear cuando el tiempo está cumplido"
+              />
+              <label htmlFor="set-blink" className="cns-setlab cursor-pointer">
+                Parpadeo
+              </label>
+              <Switch
+                id="set-auto"
+                checked={state.settings.autoAdvance}
+                onCheckedChange={(v) => setSettings({ autoAdvance: v })}
+                aria-label="Auto-iniciar el siguiente momento"
+              />
+              <label htmlFor="set-auto" className="cns-setlab cursor-pointer">
+                Auto
+              </label>
+              <Switch
+                id="set-bullets"
+                checked={state.settings.showBulletsOnTimer}
+                onCheckedChange={(v) => setSettings({ showBulletsOnTimer: v })}
+                aria-label="Mostrar puntos clave en modo contador"
+              />
+              <label htmlFor="set-bullets" className="cns-setlab cursor-pointer">
+                Puntos
+              </label>
+            </div>
+            <span className="cns-ver">{VERSION_APP}</span>
+            <span
+              className={cn(
+                "cns-pill hidden md:inline-flex",
+                peerOnline ? "cns-pill-ok" : "cns-pill-dim",
+              )}
+            >
+              <span className={cn("cns-led", peerOnline && "cns-led-ok")} />
+              {peerOnline ? "Pantalla conectada" : "Sin pantallas abiertas"}
+            </span>
+            <Button size="sm" className="cns-btn-gold" onClick={openPreacherWindow}>
+              <MonitorSpeaker className="h-4 w-4" aria-hidden="true" />
+              <span className="hidden sm:inline">Abrir pantalla del predicador</span>
+            </Button>
+            <HelpDialog />
+          </div>
+        </div>
+      </header>
+
+      <main className="mx-auto flex w-full max-w-[1440px] min-h-0 flex-1 flex-col gap-3 px-4 py-3">
+        <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(330px,380px)]">
+          {/* ═══ Orden del culto: cajas grandes en vertical; entre bloque y
+                 bloque, el lapso en minutos como conector ═══ */}
+          <section className="cns-panel cns-rise order-2 flex min-h-0 flex-col lg:order-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5">
+              <div className="cns-eyebrow">Programa</div>
+              <h2 className="cns-h2 text-base">Orden del culto</h2>
+              <p className="cns-sub min-w-0 flex-1 truncate">
+                {state.segments.length} momentos · {fmtMin(totalMin)} · un clic salta
+                al momento · doble clic lo edita
+              </p>
+              <div className="ml-auto flex shrink-0 items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="cns-btn-ghost h-7 shrink-0 text-xs"
+                  title="Guardar los tiempos de este culto con un nombre y cargar otros programas guardados"
+                  aria-label="Programas guardados"
+                  onClick={() => setProgOpen(true)}
+                >
+                  <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" /> Programas
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="cns-btn-ghost h-7 shrink-0 text-xs"
+                  title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
+                  aria-label="Cargar plantilla sabática"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
+                      )
+                    ) {
+                      mutate((p) => ({ ...p, segments: defaultSegments() }));
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
+                </Button>
+              </div>
+            </div>
+            {/* Franja horaria: la hora real a la par del programa */}
+            <div className="cns-franja mt-1.5">
+              <Clock
+                className="h-3.5 w-3.5 shrink-0 text-[#A3823F]"
+                aria-hidden="true"
+              />
+              <span className="cns-franja-lab">Franja horaria</span>
+              <label className="flex items-center gap-1.5">
+                <span className="cns-franja-lab">Inicio</span>
+                <input
+                  type="time"
+                  className="cns-in"
+                  value={franja.inicio}
+                  aria-label="Hora de inicio del culto"
+                  onChange={(e) =>
+                    setFranja((f) => ({ ...f, inicio: e.target.value || f.inicio }))
+                  }
+                />
+              </label>
+              <label className="flex items-center gap-1.5">
+                <span className="cns-franja-lab">Límite</span>
+                <input
+                  type="time"
+                  className="cns-in"
+                  value={franja.limite}
+                  aria-label="Hora límite del culto"
+                  onChange={(e) =>
+                    setFranja((f) => ({ ...f, limite: e.target.value || f.limite }))
+                  }
+                />
+              </label>
+              <span
+                className="cns-franja-lab"
+                title="Hora en que termina el culto según el programa"
+              >
+                Fin <b>{fmtHora(finPlanMin)}</b>
+              </span>
+              {enMarcha && finEstMin !== null ? (
+                <span
+                  className="cns-franja-lab"
+                  title="Hora en que terminarías si seguís así: hora actual + lo que queda"
+                >
+                  Fin est. <b>{fmtHora(finEstMin)}</b>
+                </span>
+              ) : null}
+              <span className="cns-franja-lab">
+                Ahora <b>{ahoraTxt}</b>
+              </span>
+              <span className={cn("cns-pill ml-auto", franjaEstado.pill)}>
+                <span className={franjaEstado.led} /> {franjaEstado.text}
+              </span>
+            </div>
+            <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 pt-2.5">
+              <div className="flex flex-col">
+                {state.segments.map((x, i) => {
+                  const isCurrent =
+                    i === state.currentIndex && state.status !== "finished";
+                  const isDone = state.currentIndex >= 0 && i < state.currentIndex;
+                  const tipo = tipoDeMomento(x.title);
+                  return (
+                    <Fragment key={x.id}>
+                      <div className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-2.5">
+                        <div
+                          className={cn(
+                            "cns-hora",
+                            isCurrent && "cns-hora-now",
+                            isDone && "cns-box-done",
+                          )}
+                          aria-hidden="true"
+                        >
+                          <span>{fmtHora(inicios[i])}</span>
+                          {isCurrent ? <small>AHORA {ahoraTxt}</small> : null}
+                        </div>
+                        <div
+                          ref={isCurrent ? currentChipRef : undefined}
+                          onClick={() => {
+                            if (i !== state.currentIndex) mutate((p) => jumpTo(p, i));
+                            setMenuIdx(null);
+                          }}
+                          onDoubleClick={() => setEditingId(x.id)}
+                          title="Un clic: saltar a este momento · doble clic: editarlo"
+                          className={cn(
+                            "cns-box",
+                            isCurrent && "cns-box-now",
+                            isDone && "cns-box-done",
+                          )}
+                        >
+                          <span className="cns-box-num">{i + 1}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="cns-box-title block truncate">
+                              {x.title}
+                            </span>
+                            <span className="mt-1 flex min-w-0 items-center gap-2">
+                              <span className={cn("cns-tipo", tipo.tone)}>
+                                {tipo.label}
+                              </span>
+                              {x.speaker ? (
+                                <span className="cns-box-speaker truncate">
+                                  {x.speaker}
+                                </span>
+                              ) : null}
+                            </span>
+                          </span>
+                          {/* A la derecha: los puntos de este momento (lo que
+                              viene) y cuántos minutos dispone */}
+                          <span className="cns-box-side">
+                            {x.bullets.length > 0 ? (
+                              <span className="cns-box-puntos">
+                                {x.bullets.slice(0, 3).map((b, j) => (
+                                  <span key={j} className="cns-box-punto">
+                                    <span>{b}</span>
+                                  </span>
+                                ))}
+                                {x.bullets.length > 3 ? (
+                                  <span className="cns-box-punto cns-box-punto-mas">
+                                    +{x.bullets.length - 3} puntos más
+                                  </span>
+                                ) : null}
+                              </span>
+                            ) : null}
+                            <span className="cns-minchip">{x.minutes} min</span>
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Más opciones de ${x.title}`}
+                            title="Más opciones"
+                            className="cns-icobtn grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const r = e.currentTarget.getBoundingClientRect();
+                              setMenuPos({ x: r.right, y: r.bottom + 4 });
+                              setMenuIdx(menuIdx === i ? null : i);
+                            }}
+                          >
+                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          {menuIdx === i
+                            ? createPortal(
+                                <div
+                                  className="cns-menu"
+                                  style={{
+                                    position: "fixed",
+                                    top: menuPos.y,
+                                    left: menuPos.x,
+                                    transform: "translateX(-100%)",
+                                  }}
+                                  onClick={(e2) => e2.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingId(x.id);
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Editar momento
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      mutate((p) => jumpTo(p, i));
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Ir a este momento
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={i === 0}
+                                    onClick={() => {
+                                      moveSegment(i, -1);
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Subir
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={i === state.segments.length - 1}
+                                    onClick={() => {
+                                      moveSegment(i, 1);
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Bajar
+                                  </button>
+                                </div>,
+                                document.body,
+                              )
+                            : null}
+                        </div>
+                      </div>
+                      {/* El lapso hasta el próximo bloque: los minutos de este
+                          momento, como conector de la línea de tiempo */}
+                      <div className="cns-connector" aria-hidden="true">
+                        <span className="cns-connector-pill">{x.minutes} min</span>
+                      </div>
+                    </Fragment>
+                  );
+                })}
+                {/* Fin del culto según la franja horaria */}
+                <div className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-2.5">
+                  <div className="cns-hora" aria-hidden="true">
+                    <span>{fmtHora(finPlanMin)}</span>
+                  </div>
+                  <div className="cns-fin">
+                    <span className="cns-fin-titulo">Fin del culto</span>
+                    <span className="cns-sub">
+                      Límite {franja.limite} · Ahora {ahoraTxt}
+                    </span>
+                    <span className={cn("cns-pill ml-auto", franjaEstado.pill)}>
+                      <span className={franjaEstado.led} /> {franjaEstado.text}
+                    </span>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={addSegment}
+                  aria-label="Agregar momento"
+                  className="cns-box-add shrink-0 cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Agregar momento
+                </button>
+              </div>
+            </div>
+          </section>
+
+          {/* ═══ Columna derecha: mesa de control + mensajes ═══ */}
+          <div className="order-1 flex min-h-0 flex-col gap-2.5 overflow-y-auto scrollbar-thin lg:order-2">
+            {/* ── Mesa de control: el momento en curso ── */}
+            <section
+              className={cn(
+                "cns-panel cns-rise shrink-0",
+                active && "cns-panel-active",
+              )}
+            >
+              <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
+                <div className="flex min-w-0 items-baseline gap-2.5">
+                  <span className="cns-eyebrow">Mesa</span>
+                  <h2 className="cns-h2 min-w-0 truncate text-lg">
+                    {active ? `Ahora · ${seg?.title}` : "Ahora"}
+                  </h2>
+                </div>
+                {statusPill}
+              </div>
+              {active && (seg?.speaker || next) ? (
+                <p className="cns-sub px-4 pt-0.5 text-[11px]">
+                  {seg?.speaker ? `Orador: ${seg.speaker}` : null}
+                  {seg?.speaker && next ? " · " : null}
+                  {next ? `Siguiente: ${next.title} (${next.minutes} min)` : null}
+                </p>
+              ) : null}
+
+              <div className="px-4 pb-3 pt-1.5">
+                {state.status === "finished" ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+                    <div className="min-w-0">
+                      <div className="cns-h2 text-lg">Culto finalizado</div>
+                      <p className="cns-sub mt-0.5">
+                        Reiniciá para comenzar un nuevo culto.
+                      </p>
+                    </div>
+                    <Button
+                      className="cns-btn-line h-10 shrink-0"
+                      variant="outline"
+                      onClick={doRestartService}
+                    >
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" /> Reiniciar
+                      todo
+                    </Button>
+                  </div>
+                ) : !active ? (
+                  <div className="flex flex-wrap items-center justify-between gap-3 py-2">
+                    <div className="min-w-0">
+                      <div className="cns-h2 text-lg">El culto no comenzó</div>
+                      <p className="cns-sub mt-0.5">
+                        {state.segments.length} momentos · {fmtMin(totalMin)}{" "}
+                        planificados · {fmtHora(inicioMin)} → {fmtHora(finPlanMin)}
+                      </p>
+                    </div>
+                    <Button
+                      className="cns-btn-gold h-12 shrink-0 px-8 text-base"
+                      onClick={() => mutate((p) => start(p, Date.now()))}
+                    >
+                      <Play className="h-5 w-5" aria-hidden="true" /> Iniciar culto
+                    </Button>
+                  </div>
+                ) : (
+                  <>
+                    {/* Reloj principal */}
+                    <div className="text-center">
+                      <div className="cns-timer-label">
+                        {phase === "overtime" ? "Excedente" : "Tiempo restante"}
+                      </div>
+                      <div
+                        className={cn(
+                          "cns-timer mt-0.5 text-5xl tabular-nums md:text-6xl",
+                          counterColor,
+                        )}
+                      >
+                        {live
+                          ? phase === "overtime"
+                            ? `+${fmtHMS(Math.floor(overtimeMs / 1000))}`
+                            : fmtHMS(Math.ceil(remaining / 1000))
+                          : "--:--"}
+                      </div>
+                      <div className="mt-0.5 text-xs text-muted-foreground">
+                        {phase === "overtime"
+                          ? "Tiempo cumplido — excedente"
+                          : `de ${seg?.minutes} min planificados`}
+                      </div>
+                    </div>
+
+                    {/* Medidor de avance */}
+                    <Progress
+                      value={totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0}
+                      className={cn(
+                        "mt-2 h-1.5 bg-[#EDE4D0]",
+                        phase === "overtime"
+                          ? "[&>div]:bg-[#B0452F]"
+                          : phase === "warning"
+                            ? "[&>div]:bg-[#C08A2E]"
+                            : "[&>div]:bg-[#7A5A3A]",
+                      )}
+                    />
+                    <div className="mt-1.5 grid grid-cols-3 gap-1 text-center font-mono text-muted-foreground">
+                      <div className="min-w-0">
+                        <div className="text-[9px] tracking-[0.14em]">
+                          TRANSCURRIDO
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                          {fmtHMS(Math.floor(elapsed / 1000))}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[9px] tracking-[0.14em]">
+                          RESTANTE CULTO
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                          {fmtMin(plannedRemain)}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[9px] tracking-[0.14em]">
+                          PLANIFICADO
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                          {seg?.minutes} MIN
+                        </div>
+                      </div>
+                    </div>
+
+                    {phase === "overtime" ? (
+                      <div className="cns-alert-danger mt-2.5">
+                        <AlertTriangle
+                          className="h-4 w-4 shrink-0"
+                          aria-hidden="true"
+                        />
+                        Se cumplió el tiempo hace{" "}
+                        {fmtHMS(Math.floor(overtimeMs / 1000))}. Considerá pasar al
+                        siguiente momento.
+                      </div>
+                    ) : null}
+
+                    {/* Controles de la consola: dos filas compactas */}
+                    <div className="mt-2.5 flex gap-1.5">
+                      <Button
+                        className={cn(
+                          "h-9 min-w-0 flex-[1.4] text-sm",
+                          state.status === "running"
+                            ? "cns-btn-line"
+                            : "cns-btn-gold",
+                        )}
+                        onClick={toggleStartPause}
+                      >
+                        {state.status === "running" ? (
+                          <>
+                            <Pause className="h-4 w-4" aria-hidden="true" /> Pausar
+                          </>
+                        ) : (
+                          <>
+                            <Play className="h-4 w-4" aria-hidden="true" />{" "}
+                            {state.elapsedBefore > 0 ? "Reanudar" : "Iniciar"}
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="cns-btn-line h-9 min-w-0 flex-1 text-xs"
+                        onClick={doAdvance}
+                      >
+                        <SkipForward className="h-4 w-4" aria-hidden="true" />{" "}
+                        Siguiente
+                      </Button>
+                    </div>
+                    <div className="mt-1.5 flex gap-1.5">
+                      <Button
+                        variant="ghost"
+                        className="cns-btn-ghost h-9 min-w-0 flex-1 justify-center"
+                        title="Reiniciar el cronómetro de este momento (R)"
+                        aria-label="Reiniciar el cronómetro de este momento"
+                        onClick={doReset}
+                      >
+                        <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="cns-btn-ghost h-9 min-w-0 flex-1 justify-center"
+                        title="Momento anterior"
+                        aria-label="Momento anterior"
+                        onClick={doBack}
+                      >
+                        <SkipBack className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="cns-btn-ghost h-9 min-w-0 flex-[1.4] justify-center text-xs"
+                        title="Restar 1 minuto al momento"
+                        onClick={() => adjustMinutes(-1)}
+                      >
+                        <Minus className="h-3.5 w-3.5" aria-hidden="true" /> 1 min
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        className="cns-btn-ghost h-9 min-w-0 flex-[1.4] justify-center text-xs"
+                        title="Sumar 1 minuto al momento"
+                        onClick={() => adjustMinutes(1)}
+                      >
+                        <Plus className="h-3.5 w-3.5" aria-hidden="true" /> 1 min
+                      </Button>
+                    </div>
+
+                    {seg && seg.cards ? (
+                      <div className="mt-3 space-y-2 rounded-xl border-2 border-dashed border-[rgba(176,141,87,0.45)] bg-[rgba(176,141,87,0.08)] p-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#8A6A30]">
+                            Tarjeta en pantalla · editable
+                          </div>
+                          <Switch
+                            checked={!!seg.cards}
+                            onCheckedChange={(v) => updateSegment(seg.id, { cards: v })}
+                            aria-label="Desactivar la tarjeta grande en este momento"
+                          />
+                        </div>
+
+                        <div className="scrollbar-thin max-h-[100px] space-y-1.5 overflow-y-auto pr-0.5">
+                          {seg.bullets.map((b, i) => (
+                            <div key={i} className="flex items-start gap-1.5">
+                              <Textarea
+                                value={b}
+                                rows={2}
+                                aria-label={`Editar punto ${i + 1}`}
+                                placeholder={`Punto ${i + 1}…`}
+                                className="cns-in min-h-0 flex-1 rounded-xl text-sm font-bold leading-snug"
+                                onChange={(e) => {
+                                  const arr = [...seg.bullets];
+                                  arr[i] = e.target.value;
+                                  updateSegment(seg.id, { bullets: arr });
+                                }}
+                              />
+                              <Button
+                                size="icon"
+                                variant="ghost"
+                                className="cns-icobtn h-8 w-7 shrink-0"
+                                aria-label={`Quitar punto ${i + 1}`}
+                                disabled={seg.bullets.length <= 1}
+                                onClick={() =>
+                                  updateSegment(seg.id, {
+                                    bullets: seg.bullets.filter((_, j) => j !== i),
+                                  })
+                                }
+                              >
+                                <X className="h-3.5 w-3.5" aria-hidden="true" />
+                              </Button>
+                            </div>
+                          ))}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="cns-btn-line h-7"
+                            onClick={() =>
+                              updateSegment(seg.id, { bullets: [...seg.bullets, ""] })
+                            }
+                          >
+                            <Plus className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                            Agregar punto
+                          </Button>
+                        </div>
+                      </div>
+                    ) : seg ? (
+                      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#DCD2BE] bg-[#F6F1E6] p-2.5">
+                        <div className="min-w-0">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
+                            Tarjeta en pantalla
+                          </div>
+                          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+                            ¿Avisos o puntos? Mostralos en una sola tarjeta con letra
+                            grande.
+                          </p>
+                        </div>
+                        <Switch
+                          checked={!!seg.cards}
+                          onCheckedChange={(v) => updateSegment(seg.id, { cards: v })}
+                          aria-label="Activar la tarjeta grande en este momento"
+                          className="shrink-0"
+                        />
+                      </div>
+                    ) : null}
+                  </>
+                )}
+              </div>
+            </section>
+
+            {/* ── Mensajes al orador ── */}
+            <section className="cns-panel cns-rise shrink-0">
+              <div className="space-y-2 px-4 pb-2.5 pt-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="cns-eyebrow">
+                    <MessageSquare
+                      className="h-3.5 w-3.5"
+                      aria-hidden="true"
+                    />{" "}
+                    Intercomunicador
+                  </div>
+                  {state.message ? (
+                    <div className="flex min-w-0 items-center gap-2">
+                      <span className="min-w-0 max-w-[210px] truncate text-xs text-muted-foreground">
+                        En pantalla: <b>“{state.message.text}”</b>
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="cns-btn-line h-7 shrink-0 text-xs"
+                        onClick={() => mutate((p) => ({ ...p, message: null }))}
+                      >
+                        <X className="h-3 w-3" aria-hidden="true" /> Limpiar
+                      </Button>
+                    </div>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">
+                      Sale gigante en la pantalla del predicador
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    aria-label="Mensaje personalizado"
+                    placeholder="Escribir mensaje…"
+                    value={msgDraft}
+                    className="cns-in h-9 min-w-0 flex-1"
+                    onChange={(e) => setMsgDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        sendMessage(msgDraft, msgUrgent);
+                        setMsgDraft("");
+                      }
+                    }}
+                  />
+                  <Switch
+                    id="msg-urgent"
+                    checked={msgUrgent}
+                    onCheckedChange={setMsgUrgent}
+                    aria-label="Mensaje urgente (rojo)"
+                  />
+                  <Label
+                    htmlFor="msg-urgent"
+                    className="cns-setlab shrink-0 cursor-pointer"
+                  >
+                    Urgente
+                  </Label>
+                  <Button
+                    size="icon"
+                    aria-label="Enviar mensaje"
+                    className="cns-btn-gold h-9 w-9 shrink-0"
+                    onClick={() => {
+                      sendMessage(msgDraft, msgUrgent);
+                      setMsgDraft("");
+                    }}
+                  >
+                    <Send className="h-4 w-4" aria-hidden="true" />
+                  </Button>
+                </div>
+              </div>
+            </section>
+          </div>
+        </div>
+      </main>
+
+      {/* Editor de momento (modal) */}
+      <Dialog
+        open={!!editingSeg}
+        onOpenChange={(o) => {
+          if (!o) setEditingId(null);
+        }}
+      >
+        <DialogContent className="cns-modal max-h-[85vh] max-w-lg overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Editar momento</DialogTitle>
+            <DialogDescription>
+              Los cambios se ven al instante en la pantalla del predicador.
+            </DialogDescription>
+          </DialogHeader>
+          {editingSeg ? (
+            <SegmentEditor
+              seg={editingSeg}
+              canDelete={state.segments.length > 1}
+              onUpdate={(patch) => updateSegment(editingSeg.id, patch)}
+              onDelete={() => {
+                removeSegment(editingSeg.id);
+                setEditingId(null);
+              }}
+              onJump={() => {
+                const idx = state.segments.findIndex((s) => s.id === editingSeg.id);
+                if (idx >= 0) mutate((p) => jumpTo(p, idx));
+                setEditingId(null);
+              }}
+            />
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      {/* Programas guardados: cada tipo de culto con sus tiempos */}
+      <Dialog open={progOpen} onOpenChange={setProgOpen}>
+        <DialogContent className="cns-modal max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Programas guardados</DialogTitle>
+            <DialogDescription>
+              Guardá los tiempos de cada tipo de culto (mañana, evangelismo, jóvenes,
+              oración…) y cargalos cuando quieras: después los ajustás en vivo. Todo
+              viaja a un <b>servidor</b>: con el código, la misma lista aparece en
+              cualquier computadora.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1 space-y-1">
+                <Label htmlFor="prog-nombre" className="text-xs">
+                  Guardar el programa actual como
+                </Label>
+                <Input
+                  id="prog-nombre"
+                  className="cns-in"
+                  value={progNombre}
+                  placeholder="Ej.: Culto joven"
+                  onChange={(e) => setProgNombre(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") guardarPrograma();
+                  }}
+                />
+              </div>
+              <Button
+                className="cns-btn-gold h-9 shrink-0"
+                onClick={guardarPrograma}
+              >
+                <Save className="h-4 w-4" aria-hidden="true" /> Guardar
+              </Button>
+            </div>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Se guarda con la franja horaria actual (Inicio {franja.inicio} · Límite{" "}
+              {franja.limite}) y los {state.segments.length} momentos de la lista, con
+              sus puntos. Si guardás con un nombre que ya existe, lo reemplaza.
+            </p>
+            {/* Guardado en el servidor: código de sincronización entre computadoras */}
+            <div
+              className="space-y-2 rounded-xl border p-2.5"
+              style={{ borderColor: "rgba(180,160,120,.35)" }}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <Label className="text-xs">Guardado en el servidor</Label>
+                <span className={cn("cns-pill", nubePill)}>
+                  <span className={nubeLed} /> {nubeTexto}
+                </span>
+              </div>
+              {nubeCodigo ? (
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-muted-foreground">
+                    Código de esta lista:
+                  </span>
+                  <code className="cns-kbd">{nubeCodigo}</code>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="cns-btn-line h-7 text-xs"
+                    onClick={() => void copiarNubeCodigo()}
+                  >
+                    Copiar
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  Cuando guardes el primer programa se genera el código; anotalo para
+                  la otra computadora.
+                </p>
+              )}
+              <div className="flex items-center gap-2">
+                <Input
+                  className="cns-in h-9 min-w-0 flex-1"
+                  value={nubeEntrada}
+                  placeholder="¿En otra compu? Pegá acá el código…"
+                  aria-label="Código de la nube para conectar"
+                  onChange={(e) => setNubeEntrada(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") void conectarNube();
+                  }}
+                />
+                <Button
+                  size="sm"
+                  className="cns-btn-gold h-9 shrink-0"
+                  disabled={!nubeEntrada.trim()}
+                  onClick={() => void conectarNube()}
+                >
+                  Conectar
+                </Button>
+              </div>
+              <p className="text-[11px] leading-snug text-muted-foreground">
+                Cada vez que guardás o borrás un programa, el cambio va al servidor
+                enseguida. En otra computadora: abrí esta página, tocá{" "}
+                <b>Programas</b>, pegá el mismo código y tocá <b>Conectar</b> —
+                aparece la misma lista. Si no hay internet, queda guardado en esta
+                computadora nomás.
+              </p>
+            </div>
+            <div className="cns-sep" />
+            {programas.length === 0 ? (
+              <p className="cns-sub">
+                Todavía no guardaste ningún programa. Configurá los momentos y las
+                horas, ponle un nombre arriba y tocá <b>Guardar</b>.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {programas.map((pr) => {
+                  const total = pr.segments.reduce((a, x) => a + x.minutes, 0);
+                  const ini = minDeHora(pr.inicio) ?? 570;
+                  return (
+                    <li
+                      key={pr.id}
+                      className="flex items-center justify-between gap-2 rounded-xl border p-2.5"
+                      style={{ borderColor: "rgba(180,160,120,.35)" }}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-[#241E16]">
+                          {pr.nombre}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {pr.segments.length} momentos · {fmtMin(total)} ·{" "}
+                          {fmtHora(ini)} → {fmtHora(ini + total)}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="cns-btn-line h-8 text-xs"
+                          onClick={() => {
+                            const enCurso = state.status !== "idle";
+                            if (
+                              window.confirm(
+                                `¿Cargar el programa “${pr.nombre}”? Se reemplazan los momentos actuales${
+                                  enCurso ? " y el contador se reinicia" : ""
+                                }.`,
+                              )
+                            ) {
+                              cargarPrograma(pr);
+                            }
+                          }}
+                        >
+                          Cargar
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="cns-icobtn h-8 w-8 shrink-0"
+                          aria-label={`Eliminar el programa ${pr.nombre}`}
+                          title="Eliminar este programa"
+                          onClick={() => borrarPrograma(pr.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
+
+/* ─────────────────────── Editor de momento ─────────────────────── */
+
+function SegmentEditor({
+  seg,
+  onUpdate,
+  onDelete,
+  onJump,
+  canDelete,
+}: {
+  seg: Segment;
+  onUpdate: (patch: Partial<Segment>) => void;
+  onDelete: () => void;
+  onJump: () => void;
+  canDelete: boolean;
+}) {
+  const [bulletDraft, setBulletDraft] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
+  const addBullet = () => {
+    const t = bulletDraft.trim();
+    if (!t) return;
+    onUpdate({ bullets: [...seg.bullets, t] });
+    setBulletDraft("");
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-2">
+        <div className="col-span-2 space-y-1">
+          <Label htmlFor={`t-${seg.id}`} className="text-xs">
+            Título
+          </Label>
+          <Input
+            id={`t-${seg.id}`}
+            className="cns-in"
+            value={seg.title}
+            onChange={(e) => onUpdate({ title: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`s-${seg.id}`} className="text-xs">
+            Orador
+          </Label>
+          <Input
+            id={`s-${seg.id}`}
+            className="cns-in"
+            value={seg.speaker}
+            placeholder="Ej.: Anunciador"
+            onChange={(e) => onUpdate({ speaker: e.target.value })}
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={`m-${seg.id}`} className="text-xs">
+            Duración (min)
+          </Label>
+          <Input
+            id={`m-${seg.id}`}
+            className="cns-in"
+            type="number"
+            min={1}
+            max={600}
+            value={seg.minutes}
+            onChange={(e) => {
+              const v = Number(e.target.value);
+              if (Number.isFinite(v)) onUpdate({ minutes: Math.min(600, Math.max(1, Math.round(v))) });
+            }}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">Cómo se muestra en la pantalla</Label>
+        <Select
+          value={seg.layout}
+          onValueChange={(v) => onUpdate({ layout: v === "script" ? "script" : "timer" })}
+        >
+          <SelectTrigger className="cns-in">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent className="cns-pop">
+            <SelectItem value="timer">Contador grande</SelectItem>
+            <SelectItem value="script">Guion + contador abajo</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "rgba(180,160,120,.35)" }}>
+        <div className="min-w-0">
+          <Label htmlFor={`c-${seg.id}`} className="text-xs font-medium">
+            Tarjeta grande en pantalla
+          </Label>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            Muestra todos los puntos juntos en una sola tarjeta, con letra grande
+            (ideal para los anuncios; anula el guion y el contador grande).
+          </p>
+        </div>
+        <Switch
+          id={`c-${seg.id}`}
+          checked={seg.cards}
+          onCheckedChange={(v) => onUpdate({ cards: v })}
+          className="mt-0.5 shrink-0"
+        />
+      </div>
+
+      <div className="space-y-1.5">
+        <Label className="text-xs">
+          {seg.cards ? "Puntos de la tarjeta" : "Puntos clave"}
+        </Label>
+        {seg.bullets.map((b, i) => (
+        <div key={i} className="flex gap-1.5">
+            {seg.cards ? (
+              <Textarea
+                className="cns-in"
+                value={b}
+                rows={2}
+                aria-label={`Punto ${i + 1}`}
+                onChange={(e) => {
+                  const arr = [...seg.bullets];
+                  arr[i] = e.target.value;
+                  onUpdate({ bullets: arr });
+                }}
+              />
+            ) : (
+              <Input
+                className="cns-in"
+                value={b}
+                aria-label={`Punto ${i + 1}`}
+                onChange={(e) => {
+                  const arr = [...seg.bullets];
+                  arr[i] = e.target.value;
+                  onUpdate({ bullets: arr });
+                }}
+              />
+            )}
+            <Button
+              size="icon"
+              variant="ghost"
+              className="cns-icobtn h-10 w-9 shrink-0 self-start"
+              aria-label={`Quitar punto ${i + 1}`}
+              onClick={() => onUpdate({ bullets: seg.bullets.filter((_, j) => j !== i) })}
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+            </Button>
+          </div>
+        ))}
+        <div className="flex gap-1.5">
+          <Input
+            className="cns-in"
+            value={bulletDraft}
+            placeholder="Agregar punto…"
+            aria-label="Nuevo punto clave"
+            onChange={(e) => setBulletDraft(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addBullet();
+            }}
+          />
+          <Button
+            size="icon"
+            variant="outline"
+            className="cns-btn-line h-10 w-9 shrink-0"
+            aria-label="Agregar punto"
+            onClick={addBullet}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+          </Button>
+        </div>
+      </div>
+
+      <div className="space-y-1">
+        <Label className="text-xs">
+          Guion extendido (se muestra en la pantalla del predicador)
+          {seg.cards ? " — queda anulado mientras la tarjeta esté activa" : ""}
+        </Label>
+        <Textarea
+          className="cns-in"
+          value={seg.script}
+          rows={4}
+          placeholder="Texto más largo que se muestra en la pantalla del predicador…"
+          onChange={(e) => onUpdate({ script: e.target.value })}
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-2 pt-1">
+        <Button size="sm" variant="secondary" onClick={onJump}>
+          <SkipForward className="h-3.5 w-3.5" aria-hidden="true" /> Ir a este momento
+        </Button>
+        {canDelete ? (
+          confirmDelete ? (
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => {
+                onDelete();
+                setConfirmDelete(false);
+              }}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Confirmar
+            </Button>
+          ) : (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-[#B0452F] hover:text-[#B0452F]"
+              onClick={() => setConfirmDelete(true)}
+            >
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar
+            </Button>
+          )
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+/* ────────────────────────── Ayuda ─────────────────────────────── */
+
+function HelpDialog() {
+  return (
+    <Dialog>
+      <DialogTrigger asChild>
+        <Button size="icon" variant="ghost" className="cns-icobtn" aria-label="Ayuda de uso">
+          <HelpCircle className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="cns-modal max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Cómo usar con el proyector</DialogTitle>
+          <DialogDescription>
+            Sistema de control de tiempos para el culto: contador, tarjetas y mensajes
+            al orador.
+          </DialogDescription>
+        </DialogHeader>
+        <ol className="list-decimal space-y-2.5 pl-5 text-sm">
+          <li>
+            Tocá <b>“Abrir pantalla del predicador”</b>: es la única pantalla — hace
+            de proyección y de pantalla del predicador a la vez. Con un solo monitor,
+            abrí esa y listo: muestra el contador, las tarjetas de avisos, la letra
+            bíblica y los mensajes.
+          </li>
+          <li>
+            Ponela en pantalla completa con el botón de la esquina (o con <b>F11</b>)
+            y proyectala al monitor o TV de la iglesia.
+          </li>
+          <li>
+            Volvé a esta ventana y manejá el culto desde el <b>orden del culto</b> en
+            vertical: la lista se <b>desplaza con la rueda del mouse</b>, un{" "}
+            <b>clic</b> salta a un momento y un <b>doble clic</b> lo edita (también
+            con los <b>tres puntitos</b>). Entre bloque y bloque se ve el{" "}
+            <b>lapso en minutos</b> de cada momento, como conectores de la línea de
+            tiempo, y cada caja muestra a la derecha <b>los puntos</b> de ese momento
+            y <b>cuántos minutos</b> dispone. Mensajes al orador en la columna de la
+            derecha.
+          </li>
+        </ol>
+        <div className="cns-sep" />
+        <div className="cns-note">
+          <b>Avisos en una sola tarjeta:</b> en la sección <b>“Ahora”</b> activá el
+          interruptor <b>Tarjetas</b> y escribí los puntos ahí mismo: todos se ven
+          juntos en <b>una sola tarjeta gigante</b> en la pantalla del predicador, y los
+          vas editando en vivo. Los avisos de un momento futuro se preparan con{" "}
+          <b>doble clic</b> sobre ese momento en la secuencia.
+        </div>
+        <div className="cns-sep" />
+        <ul className="space-y-1.5 text-xs text-muted-foreground">
+          <li>
+            · La <b>franja horaria</b> arriba del orden del culto: poné la{" "}
+            <b>hora de inicio</b> (ej. 9:30) y la <b>hora límite</b> (ej. 12:00).
+            Cada momento muestra su horario al costado y la píldora te avisa el{" "}
+            <b>margen</b> que te queda — o si te pasás del límite — mientras
+            ajustás los minutos.
+          </li>
+          <li>
+            · El botón <b>Programas</b> guarda los tiempos de cada tipo de culto{" "}
+            (mañana, evangelismo, jóvenes, oración): configurá los momentos y las
+            horas, guardalo con un nombre y cargalo cuando lo necesites. Siempre
+            queda editable: cambiás minutos y horas igual que antes.
+          </li>
+          <li>
+            · Los programas se guardan <b>en el servidor</b>, no solo en la compu:{" "}
+            <b>Programas</b> te da un <b>código</b>. En otra computadora abrí la
+            página, tocá <b>Programas</b>, pegá el código y <b>Conectar</b>: aparece
+            la misma lista, lista para ajustar.
+          </li>
+          <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
+          <li>
+            · Los versículos de <b>Biblia Sincronizada</b> (elegidos en su{" "}
+            <b>admin.html</b>) aparecen en vivo con el contador abajo, cortados en
+            partes de 4 renglones igual que la proyección: tocá el texto o usá ← →
+            para cambiar de parte. El servidor se cambia con el engranaje de esa
+            pantalla.
+          </li>
+          <li>
+            · Los mensajes del operador también salen en esta pantalla, encima de
+            todo lo demás: solo se ve el mensaje (rojo si es urgente, amarillo si
+            no), sin títulos ni leyendas.
+          </li>
+          <li>
+            · El contador pasa de claro a ámbar en los minutos finales y a rojo
+            cuando se cumple el tiempo.
+          </li>
+          <li>
+            · Los puntos y los minutos de cada momento también quedan guardados con
+            cada programa. Los datos de la pantalla van de una ventana a la otra; si
+            no hay internet, lo último queda en este navegador.
+          </li>
+        </ul>
+      </DialogContent>
+    </Dialog>
+  );
+}
