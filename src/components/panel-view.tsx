@@ -5,6 +5,7 @@ import { createPortal } from "react-dom";
 import {
   AlertTriangle,
   Clock,
+  FolderOpen,
   HelpCircle,
   MessageSquare,
   Minus,
@@ -14,6 +15,7 @@ import {
   Play,
   Plus,
   RotateCcw,
+  Save,
   Send,
   SkipBack,
   SkipForward,
@@ -190,6 +192,7 @@ const ESTILO_CONSOLA = `
 .cns-led-blink{ background:var(--danger);animation:cns-pulse 1.1s ease-in-out infinite; }
 .cns-pill-live .cns-led{ background:#A3823F;animation:cns-pulse 1.1s ease-in-out infinite; }
 .cns-led-ok{ background:var(--ok);animation:cns-pulse 2s ease-in-out infinite; }
+.cns-led-warn{ background:var(--warn); }
 @keyframes cns-pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
 
 /* ── Botones ── */
@@ -271,6 +274,44 @@ const ESTILO_CONSOLA = `
   transition:border-color .25s ease-in-out,color .25s ease-in-out,background .25s ease-in-out;
 }
 .cns-box-add:hover{ border-color:var(--oro);color:var(--marron);background:var(--oro-dim); }
+
+/* ── Franja horaria a la par del orden ── */
+.cns-franja{
+  display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;
+  border:1px solid var(--line);background:var(--paper);
+  border-radius:12px;padding:8px 12px;margin:4px 12px 0;
+}
+.cns-franja-lab{
+  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;
+  letter-spacing:.10em;text-transform:uppercase;color:var(--ink-mut);
+  white-space:nowrap;
+}
+.cns-franja-lab b{ color:var(--ink-2);font-weight:700;letter-spacing:0; }
+.cns-franja input{
+  font-family:'Roboto Mono',ui-monospace,monospace;font-size:12px;color:var(--ink);
+  height:28px;width:88px;padding:0 6px;background:#FFFFFF;
+}
+.cns-franja input:focus{
+  outline:none;border-color:#C9B68C;box-shadow:0 0 0 3px rgba(176,141,87,.20);
+}
+.cns-hora{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+  font-family:'Roboto Mono',ui-monospace,monospace;font-size:11.5px;font-weight:700;
+  color:#A3823F;white-space:nowrap;
+}
+.cns-hora small{
+  font-size:8.5px;font-weight:900;letter-spacing:.12em;color:var(--marron);
+}
+.cns-hora-now span{ color:var(--marron); }
+.cns-fin{
+  display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
+  border:1px solid var(--line);background:var(--card-soft);
+  border-radius:14px;padding:10px 14px;
+}
+.cns-fin-titulo{
+  font-family:'Playfair Display',Georgia,serif;font-size:15px;font-weight:700;
+  color:var(--ink);
+}
 
 /* ── Menú de los tres puntitos ── */
 .cns-menu{
@@ -408,6 +449,34 @@ function tipoDeMomento(titulo: string): { label: string; tone: string } {
   return { label: "Momento", tone: "cns-tipo-general" };
 }
 
+/* ────────────────── Franja horaria (utilidades) ────────────────── */
+
+/** "09:30" → 570 (minutos desde medianoche); null si el dato no es válido. */
+function minDeHora(hhmm: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  if (h > 23 || min > 59) return null;
+  return h * 60 + min;
+}
+
+/** 570 → "09:30" (da la vuelta a las 24 h si el culto cruza medianoche). */
+function fmtHora(min: number): string {
+  const m = ((Math.round(min) % 1440) + 1440) % 1440;
+  return `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+}
+
+/** Un programa guardado: los momentos de un tipo de culto con su franja horaria. */
+type ProgramaGuardado = {
+  id: string;
+  nombre: string;
+  inicio: string;
+  limite: string;
+  segments: Segment[];
+  creado: number;
+};
+
 export default function PanelView() {
   const { state, mutate, peerOnline } = useShowChannel("panel");
   const now = useNow(500);
@@ -416,6 +485,63 @@ export default function PanelView() {
   const [msgUrgent, setMsgUrgent] = useState(false);
   const [menuIdx, setMenuIdx] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
+
+  /* Franja horaria: hora de inicio y límite (se guarda en este navegador) */
+  const [franja, setFranja] = useState({ inicio: "09:30", limite: "12:00" });
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("culto-franja-v1");
+      if (raw) {
+        const p = JSON.parse(raw) as { inicio?: string; limite?: string };
+        if (typeof p.inicio === "string" && typeof p.limite === "string") {
+          setFranja({ inicio: p.inicio, limite: p.limite });
+        }
+      }
+    } catch {
+      /* sin datos guardados: quedan los valores por defecto */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("culto-franja-v1", JSON.stringify(franja));
+    } catch {
+      /* almacenamiento no disponible: la franja solo vive en esta sesión */
+    }
+  }, [franja]);
+
+  /* Programas guardados: cada tipo de culto (mañana, evangelismo, jóvenes,
+     oración…) con sus momentos y su franja horaria predefinida */
+  const [programas, setProgramas] = useState<ProgramaGuardado[]>([]);
+  const [progOpen, setProgOpen] = useState(false);
+  const [progNombre, setProgNombre] = useState("");
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("culto-programas-v1");
+      if (raw) {
+        const arr = JSON.parse(raw) as ProgramaGuardado[];
+        if (Array.isArray(arr)) {
+          setProgramas(
+            arr.filter(
+              (p) =>
+                p &&
+                typeof p.id === "string" &&
+                typeof p.nombre === "string" &&
+                Array.isArray(p.segments),
+            ),
+          );
+        }
+      }
+    } catch {
+      /* sin programas guardados: la lista arranca vacía */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      localStorage.setItem("culto-programas-v1", JSON.stringify(programas));
+    } catch {
+      /* almacenamiento no disponible: los programas solo viven en esta sesión */
+    }
+  }, [programas]);
 
   const stateRef = useRef(state);
   useEffect(() => {
@@ -551,6 +677,43 @@ export default function PanelView() {
     mutate((p) => ({ ...p, message: { id: uid(), text: t, urgent } }));
   };
 
+  /* ─────────────── Programas guardados por tipo de culto ─────────────── */
+
+  const guardarPrograma = () => {
+    const nombre = progNombre.trim();
+    if (!nombre) return;
+    setProgramas((p) => [
+      {
+        id: uid(),
+        nombre,
+        inicio: franja.inicio,
+        limite: franja.limite,
+        segments: state.segments.map((x) => ({ ...x, bullets: [...x.bullets] })),
+        creado: Date.now(),
+      },
+      ...p.filter((y) => y.nombre.toLowerCase() !== nombre.toLowerCase()),
+    ]);
+    setProgNombre("");
+  };
+
+  const cargarPrograma = (pr: ProgramaGuardado) => {
+    const arr = pr.segments.map((x, i) => ({
+      ...x,
+      id: uid(),
+      bullets: [...x.bullets],
+      color: (x.color || COLOR_KEYS[i % COLOR_KEYS.length]) as ColorKey,
+    }));
+    mutate((p) => ({ ...resetService(p), segments: arr }));
+    setFranja({ inicio: pr.inicio, limite: pr.limite });
+    setProgOpen(false);
+  };
+
+  const borrarPrograma = (id: string) => {
+    if (window.confirm("¿Eliminar este programa guardado?")) {
+      setProgramas((p) => p.filter((y) => y.id !== id));
+    }
+  };
+
   /* ────────────── Pantalla del predicador ────────────── */
 
   const openPreacherWindow = () => {
@@ -610,6 +773,54 @@ export default function PanelView() {
     });
     return m;
   }, [state, totalMin, active, remaining]);
+
+  /* ── Franja horaria: hora de cada momento, fin planificado y margen ── */
+  const enMarcha = state.currentIndex >= 0 && state.status !== "finished";
+  const inicioMin = minDeHora(franja.inicio) ?? 570; // 09:30 si falta el dato
+  const limiteMin = minDeHora(franja.limite) ?? 720; // 12:00 si falta el dato
+  const inicios = useMemo(() => {
+    const arr: number[] = [];
+    let acc = inicioMin;
+    for (const x of state.segments) {
+      arr.push(acc);
+      acc += x.minutes;
+    }
+    return arr;
+  }, [state.segments, inicioMin]);
+  const finPlanMin = inicioMin + totalMin;
+  const margen = limiteMin - finPlanMin;
+  const ahoraDate = now > 0 ? new Date(now) : null;
+  const ahoraTxt = ahoraDate
+    ? `${String(ahoraDate.getHours()).padStart(2, "0")}:${String(
+        ahoraDate.getMinutes(),
+      ).padStart(2, "0")}`
+    : "--:--";
+  const finEstMin =
+    ahoraDate && enMarcha
+      ? ahoraDate.getHours() * 60 + ahoraDate.getMinutes() + plannedRemain
+      : null;
+  const franjaEstado = (() => {
+    const base = enMarcha && finEstMin !== null ? limiteMin - finEstMin : margen;
+    if (base < 0) {
+      return {
+        text: `Te pasás ${-base} min del límite`,
+        pill: "cns-pill-danger",
+        led: "cns-led cns-led-blink",
+      };
+    }
+    if (base <= 10) {
+      return {
+        text: `Margen ajustado: ${base} min`,
+        pill: "cns-pill-warn",
+        led: "cns-led cns-led-warn",
+      };
+    }
+    return {
+      text: `Margen ${base} min`,
+      pill: "cns-pill-ok",
+      led: "cns-led cns-led-ok",
+    };
+  })();
 
   const editingSeg = state.segments.find((x) => x.id === editingId) ?? null;
 
@@ -771,24 +982,88 @@ export default function PanelView() {
                 {state.segments.length} momentos · {fmtMin(totalMin)} · un clic salta
                 al momento · doble clic lo edita
               </p>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="cns-btn-ghost ml-auto h-7 shrink-0 text-xs"
-                title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
-                aria-label="Cargar plantilla sabática"
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
-                    )
-                  ) {
-                    mutate((p) => ({ ...p, segments: defaultSegments() }));
+              <div className="ml-auto flex shrink-0 items-center gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="cns-btn-ghost h-7 shrink-0 text-xs"
+                  title="Guardar los tiempos de este culto con un nombre y cargar otros programas guardados"
+                  aria-label="Programas guardados"
+                  onClick={() => setProgOpen(true)}
+                >
+                  <FolderOpen className="h-3.5 w-3.5" aria-hidden="true" /> Programas
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="cns-btn-ghost h-7 shrink-0 text-xs"
+                  title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
+                  aria-label="Cargar plantilla sabática"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
+                      )
+                    ) {
+                      mutate((p) => ({ ...p, segments: defaultSegments() }));
+                    }
+                  }}
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
+                </Button>
+              </div>
+            </div>
+            {/* Franja horaria: la hora real a la par del programa */}
+            <div className="cns-franja mt-1.5">
+              <Clock
+                className="h-3.5 w-3.5 shrink-0 text-[#A3823F]"
+                aria-hidden="true"
+              />
+              <span className="cns-franja-lab">Franja horaria</span>
+              <label className="flex items-center gap-1.5">
+                <span className="cns-franja-lab">Inicio</span>
+                <input
+                  type="time"
+                  className="cns-in"
+                  value={franja.inicio}
+                  aria-label="Hora de inicio del culto"
+                  onChange={(e) =>
+                    setFranja((f) => ({ ...f, inicio: e.target.value || f.inicio }))
                   }
-                }}
+                />
+              </label>
+              <label className="flex items-center gap-1.5">
+                <span className="cns-franja-lab">Límite</span>
+                <input
+                  type="time"
+                  className="cns-in"
+                  value={franja.limite}
+                  aria-label="Hora límite del culto"
+                  onChange={(e) =>
+                    setFranja((f) => ({ ...f, limite: e.target.value || f.limite }))
+                  }
+                />
+              </label>
+              <span
+                className="cns-franja-lab"
+                title="Hora en que termina el culto según el programa"
               >
-                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
-              </Button>
+                Fin <b>{fmtHora(finPlanMin)}</b>
+              </span>
+              {enMarcha && finEstMin !== null ? (
+                <span
+                  className="cns-franja-lab"
+                  title="Hora en que terminarías si seguís así: hora actual + lo que queda"
+                >
+                  Fin est. <b>{fmtHora(finEstMin)}</b>
+                </span>
+              ) : null}
+              <span className="cns-franja-lab">
+                Ahora <b>{ahoraTxt}</b>
+              </span>
+              <span className={cn("cns-pill ml-auto", franjaEstado.pill)}>
+                <span className={franjaEstado.led} /> {franjaEstado.text}
+              </span>
             </div>
             <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 pt-2.5">
               <div className="flex flex-col">
@@ -799,104 +1074,117 @@ export default function PanelView() {
                   const tipo = tipoDeMomento(x.title);
                   return (
                     <Fragment key={x.id}>
-                      <div
-                        ref={isCurrent ? currentChipRef : undefined}
-                        onClick={() => {
-                          if (i !== state.currentIndex) mutate((p) => jumpTo(p, i));
-                          setMenuIdx(null);
-                        }}
-                        onDoubleClick={() => setEditingId(x.id)}
-                        title="Un clic: saltar a este momento · doble clic: editarlo"
-                        className={cn(
-                          "cns-box",
-                          isCurrent && "cns-box-now",
-                          isDone && "cns-box-done",
-                        )}
-                      >
-                        <span className="cns-box-num">{i + 1}</span>
-                        <span className="min-w-0 flex-1">
-                          <span className="cns-box-title block truncate">
-                            {x.title}
-                          </span>
-                          <span className="mt-1 flex min-w-0 items-center gap-2">
-                            <span className={cn("cns-tipo", tipo.tone)}>
-                              {tipo.label}
-                            </span>
-                            {x.speaker ? (
-                              <span className="cns-box-speaker truncate">
-                                {x.speaker}
-                              </span>
-                            ) : null}
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          aria-label={`Más opciones de ${x.title}`}
-                          title="Más opciones"
-                          className="cns-icobtn grid h-8 w-8 shrink-0 place-items-center rounded-lg"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const r = e.currentTarget.getBoundingClientRect();
-                            setMenuPos({ x: r.right, y: r.bottom + 4 });
-                            setMenuIdx(menuIdx === i ? null : i);
-                          }}
+                      <div className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-2.5">
+                        <div
+                          className={cn(
+                            "cns-hora",
+                            isCurrent && "cns-hora-now",
+                            isDone && "cns-box-done",
+                          )}
+                          aria-hidden="true"
                         >
-                          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                        </button>
-                        {menuIdx === i
-                          ? createPortal(
-                              <div
-                                className="cns-menu"
-                                style={{
-                                  position: "fixed",
-                                  top: menuPos.y,
-                                  left: menuPos.x,
-                                  transform: "translateX(-100%)",
-                                }}
-                                onClick={(e2) => e2.stopPropagation()}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setEditingId(x.id);
-                                    setMenuIdx(null);
+                          <span>{fmtHora(inicios[i])}</span>
+                          {isCurrent ? <small>AHORA {ahoraTxt}</small> : null}
+                        </div>
+                        <div
+                          ref={isCurrent ? currentChipRef : undefined}
+                          onClick={() => {
+                            if (i !== state.currentIndex) mutate((p) => jumpTo(p, i));
+                            setMenuIdx(null);
+                          }}
+                          onDoubleClick={() => setEditingId(x.id)}
+                          title="Un clic: saltar a este momento · doble clic: editarlo"
+                          className={cn(
+                            "cns-box",
+                            isCurrent && "cns-box-now",
+                            isDone && "cns-box-done",
+                          )}
+                        >
+                          <span className="cns-box-num">{i + 1}</span>
+                          <span className="min-w-0 flex-1">
+                            <span className="cns-box-title block truncate">
+                              {x.title}
+                            </span>
+                            <span className="mt-1 flex min-w-0 items-center gap-2">
+                              <span className={cn("cns-tipo", tipo.tone)}>
+                                {tipo.label}
+                              </span>
+                              {x.speaker ? (
+                                <span className="cns-box-speaker truncate">
+                                  {x.speaker}
+                                </span>
+                              ) : null}
+                            </span>
+                          </span>
+                          <button
+                            type="button"
+                            aria-label={`Más opciones de ${x.title}`}
+                            title="Más opciones"
+                            className="cns-icobtn grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const r = e.currentTarget.getBoundingClientRect();
+                              setMenuPos({ x: r.right, y: r.bottom + 4 });
+                              setMenuIdx(menuIdx === i ? null : i);
+                            }}
+                          >
+                            <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                          </button>
+                          {menuIdx === i
+                            ? createPortal(
+                                <div
+                                  className="cns-menu"
+                                  style={{
+                                    position: "fixed",
+                                    top: menuPos.y,
+                                    left: menuPos.x,
+                                    transform: "translateX(-100%)",
                                   }}
+                                  onClick={(e2) => e2.stopPropagation()}
                                 >
-                                  Editar momento
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    mutate((p) => jumpTo(p, i));
-                                    setMenuIdx(null);
-                                  }}
-                                >
-                                  Ir a este momento
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={i === 0}
-                                  onClick={() => {
-                                    moveSegment(i, -1);
-                                    setMenuIdx(null);
-                                  }}
-                                >
-                                  Subir
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={i === state.segments.length - 1}
-                                  onClick={() => {
-                                    moveSegment(i, 1);
-                                    setMenuIdx(null);
-                                  }}
-                                >
-                                  Bajar
-                                </button>
-                              </div>,
-                              document.body,
-                            )
-                          : null}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setEditingId(x.id);
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Editar momento
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      mutate((p) => jumpTo(p, i));
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Ir a este momento
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={i === 0}
+                                    onClick={() => {
+                                      moveSegment(i, -1);
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Subir
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={i === state.segments.length - 1}
+                                    onClick={() => {
+                                      moveSegment(i, 1);
+                                      setMenuIdx(null);
+                                    }}
+                                  >
+                                    Bajar
+                                  </button>
+                                </div>,
+                                document.body,
+                              )
+                            : null}
+                        </div>
                       </div>
                       {/* El lapso hasta el próximo bloque: los minutos de este
                           momento, como conector de la línea de tiempo */}
@@ -906,6 +1194,21 @@ export default function PanelView() {
                     </Fragment>
                   );
                 })}
+                {/* Fin del culto según la franja horaria */}
+                <div className="grid grid-cols-[56px_minmax(0,1fr)] gap-x-2.5">
+                  <div className="cns-hora" aria-hidden="true">
+                    <span>{fmtHora(finPlanMin)}</span>
+                  </div>
+                  <div className="cns-fin">
+                    <span className="cns-fin-titulo">Fin del culto</span>
+                    <span className="cns-sub">
+                      Límite {franja.limite} · Ahora {ahoraTxt}
+                    </span>
+                    <span className={cn("cns-pill ml-auto", franjaEstado.pill)}>
+                      <span className={franjaEstado.led} /> {franjaEstado.text}
+                    </span>
+                  </div>
+                </div>
                 <button
                   type="button"
                   onClick={addSegment}
@@ -968,7 +1271,7 @@ export default function PanelView() {
                       <div className="cns-h2 text-lg">El culto no comenzó</div>
                       <p className="cns-sub mt-0.5">
                         {state.segments.length} momentos · {fmtMin(totalMin)}{" "}
-                        planificados
+                        planificados · {fmtHora(inicioMin)} → {fmtHora(finPlanMin)}
                       </p>
                     </div>
                     <Button
@@ -1311,6 +1614,111 @@ export default function PanelView() {
           ) : null}
         </DialogContent>
       </Dialog>
+
+      {/* Programas guardados: cada tipo de culto con sus tiempos */}
+      <Dialog open={progOpen} onOpenChange={setProgOpen}>
+        <DialogContent className="cns-modal max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Programas guardados</DialogTitle>
+            <DialogDescription>
+              Guardá los tiempos de cada tipo de culto (mañana, evangelismo, jóvenes,
+              oración…) y cargalos cuando quieras: después los ajustás en vivo.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="flex items-end gap-2">
+              <div className="min-w-0 flex-1 space-y-1">
+                <Label htmlFor="prog-nombre" className="text-xs">
+                  Guardar el programa actual como
+                </Label>
+                <Input
+                  id="prog-nombre"
+                  className="cns-in"
+                  value={progNombre}
+                  placeholder="Ej.: Culto joven"
+                  onChange={(e) => setProgNombre(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") guardarPrograma();
+                  }}
+                />
+              </div>
+              <Button
+                className="cns-btn-gold h-9 shrink-0"
+                onClick={guardarPrograma}
+              >
+                <Save className="h-4 w-4" aria-hidden="true" /> Guardar
+              </Button>
+            </div>
+            <p className="text-[11px] leading-snug text-muted-foreground">
+              Se guarda con la franja horaria actual (Inicio {franja.inicio} · Límite{" "}
+              {franja.limite}) y los {state.segments.length} momentos de la lista. Si
+              guardás con un nombre que ya existe, lo reemplaza.
+            </p>
+            <div className="cns-sep" />
+            {programas.length === 0 ? (
+              <p className="cns-sub">
+                Todavía no guardaste ningún programa. Configurá los momentos y las
+                horas, ponle un nombre arriba y tocá <b>Guardar</b>.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {programas.map((pr) => {
+                  const total = pr.segments.reduce((a, x) => a + x.minutes, 0);
+                  const ini = minDeHora(pr.inicio) ?? 570;
+                  return (
+                    <li
+                      key={pr.id}
+                      className="flex items-center justify-between gap-2 rounded-xl border p-2.5"
+                      style={{ borderColor: "rgba(180,160,120,.35)" }}
+                    >
+                      <div className="min-w-0">
+                        <div className="text-sm font-bold text-[#241E16]">
+                          {pr.nombre}
+                        </div>
+                        <div className="text-[11px] text-muted-foreground">
+                          {pr.segments.length} momentos · {fmtMin(total)} ·{" "}
+                          {fmtHora(ini)} → {fmtHora(ini + total)}
+                        </div>
+                      </div>
+                      <div className="flex shrink-0 items-center gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="cns-btn-line h-8 text-xs"
+                          onClick={() => {
+                            const enCurso = state.status !== "idle";
+                            if (
+                              window.confirm(
+                                `¿Cargar el programa “${pr.nombre}”? Se reemplazan los momentos actuales${
+                                  enCurso ? " y el contador se reinicia" : ""
+                                }.`,
+                              )
+                            ) {
+                              cargarPrograma(pr);
+                            }
+                          }}
+                        >
+                          Cargar
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="cns-icobtn h-8 w-8 shrink-0"
+                          aria-label={`Eliminar el programa ${pr.nombre}`}
+                          title="Eliminar este programa"
+                          onClick={() => borrarPrograma(pr.id)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -1577,6 +1985,19 @@ function HelpDialog() {
         </div>
         <div className="cns-sep" />
         <ul className="space-y-1.5 text-xs text-muted-foreground">
+          <li>
+            · La <b>franja horaria</b> arriba del orden del culto: poné la{" "}
+            <b>hora de inicio</b> (ej. 9:30) y la <b>hora límite</b> (ej. 12:00).
+            Cada momento muestra su horario al costado y la píldora te avisa el{" "}
+            <b>margen</b> que te queda — o si te pasás del límite — mientras
+            ajustás los minutos.
+          </li>
+          <li>
+            · El botón <b>Programas</b> guarda los tiempos de cada tipo de culto{" "}
+            (mañana, evangelismo, jóvenes, oración): configurá los momentos y las
+            horas, guardalo con un nombre y cargalo cuando lo necesites. Siempre
+            queda editable: cambiás minutos y horas igual que antes.
+          </li>
           <li>· Las ventanas se sincronizan solas, en tiempo real.</li>
           <li>
             · Los versículos de <b>Biblia Sincronizada</b> (elegidos en su{" "}
