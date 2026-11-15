@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
   AlertTriangle,
@@ -46,9 +46,6 @@ import { cn } from "@/lib/utils";
 import {
   advance,
   back,
-  BibliaDisplay,
-  cardsActive,
-  COLORS,
   COLOR_KEYS,
   ColorKey,
   currentSegment,
@@ -74,64 +71,63 @@ import {
 import { VERSION_APP } from "@/lib/version";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Tema "Neón Violeta" — consola estilo dashboard SaaS moderno.
-   Fondo azul noche casi negro con brillos radiales violeta/índigo y cian;
-   acentos vibrantes: violeta #A855F7 / índigo #6366F1, cian #22D3EE,
-   verde neón #4ADE80, amarillo #FDE047, rosa #FB7185. Tipografías:
-   Space Grotesk (títulos), Inter (cuerpo), JetBrains Mono (números y
-   relojes). Todo scoping bajo .cns para NO tocar las pantallas de
-   proyección ni el mini monitor.
+   Tema "Crema Elegante" — consola clara, sobria y delicada para la
+   Iglesia Adventista del Séptimo Día. Fondo crema #F6F1E7, tarjetas
+   blancas y letras oscuras (negro cálido #241E16, marrón #6B4A2F,
+   blanco sobre los botones marrones), acentos dorado #B08D57. Orden del
+   culto en vertical con conectores de minutos entre los bloques.
+   Tipografías: Playfair Display (títulos), Lato (cuerpo), Roboto Mono
+   (números y relojes). Todo scoping bajo .cns para NO tocar la pantalla
+   del predicador.
    ═══════════════════════════════════════════════════════════════════════ */
 const ESTILO_CONSOLA = `
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;600;700;800;900&family=JetBrains+Mono:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lato:wght@400;700;900&family=Roboto+Mono:wght@500;600;700&display=swap');
 
 /* Las variables se definen también en .cns-modal, .cns-pop y .cns-menu porque
    los modales y desplegables se renderizan en un portal FUERA del div .cns,
-   y sin las variables los colores caerían a negro. Tema "Neón Violeta":
-   dashboard SaaS moderno con acentos violeta/índigo, cian y verde neón. */
+   y sin las variables los colores caerían al tema oscuro por defecto.
+   Tema "Crema Elegante": fondo crema, tarjetas blancas, letras oscuras
+   (negro cálido, marrón, blanco) y acentos dorado y marrón. */
 .cns, .cns-modal, .cns-pop, .cns-menu{
-  --nv-950:#03040C; --nv-900:#070A1C; --nv-800:#0C1028; --nv-700:#121735;
-  --nv-600:#1B2150; --nv-500:#2A3166;
-  --vio:#A855F7; --vio-lt:#C4B5FD; --vio-soft:rgba(139,92,246,.40);
-  --vio-dim:rgba(139,92,246,.14);
-  --cyan:#22D3EE; --cyan-lt:#67E8F9;
-  --ink:#F2F4FF; --ink-2:#C9D2F0; --ink-mut:#7E8CB0;
-  --ok:#4ADE80; --warn:#FDE047; --warn-lt:#FEF08A; --danger-lt:#FB7185;
-  --line:rgba(167,139,250,.32); --line-soft:rgba(125,140,210,.20);
+  --paper:#F6F1E7; --paper-2:#F1EADC; --card:#FFFFFF; --card-soft:#FBF8F1;
+  --ink:#241E16; --ink-2:#4A3E30; --ink-mut:#8A7A64;
+  --marron:#6B4A2F; --marron-osc:#3A2C1A;
+  --oro:#B08D57; --oro-lt:#D9C493; --oro-dim:rgba(176,141,87,.14);
+  --ok:#4E7A52; --warn:#B98A2F; --danger:#B0452F;
+  --line:#E4DCCB; --line-soft:#ECE5D5;
 }
 .cns{
-  font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif;
+  font-family:'Lato','Segoe UI',system-ui,-apple-system,sans-serif;
   color:var(--ink);
   background:
-    radial-gradient(1100px 500px at 82% -10%, rgba(139,92,246,.22), transparent 62%),
-    radial-gradient(900px 460px at -6% 108%, rgba(34,211,238,.10), transparent 55%),
-    radial-gradient(760px 420px at 55% 118%, rgba(99,102,241,.16), transparent 60%),
-    linear-gradient(180deg,#04050E 0%,#0A0D22 55%,#06081A 100%);
+    radial-gradient(1200px 520px at 85% -10%, rgba(176,141,87,.10), transparent 60%),
+    radial-gradient(900px 480px at -8% 110%, rgba(107,74,47,.07), transparent 55%),
+    linear-gradient(180deg,#F8F4EC 0%,#F3EEE1 100%);
   background-attachment:fixed;
   height:100dvh;
 }
-.cns ::selection{ background:rgba(139,92,246,.40); }
+.cns ::selection{ background:rgba(176,141,87,.30); }
 
 /* ── Paneles de la consola ── */
 .cns-panel{
-  background:linear-gradient(180deg,rgba(18,23,53,.72),rgba(8,11,28,.78));
-  border:1px solid var(--line-soft);
+  background:var(--card);
+  border:1px solid var(--line);
   border-radius:16px;
-  box-shadow:0 14px 40px rgba(2,4,16,.55), inset 0 1px 0 rgba(255,255,255,.06);
-  backdrop-filter:blur(10px);
+  box-shadow:0 1px 2px rgba(90,70,40,.05), 0 10px 30px rgba(90,70,40,.07);
 }
+.cns-panel-active{ border-color:rgba(176,141,87,.60); }
 .cns-eyebrow{
   display:flex;align-items:center;gap:8px;
-  font-family:'Space Grotesk',ui-monospace,monospace;
-  font-size:10.5px;font-weight:700;letter-spacing:.30em;text-transform:uppercase;
-  color:var(--vio-lt);
+  font-family:'Lato',system-ui,sans-serif;
+  font-size:10.5px;font-weight:900;letter-spacing:.30em;text-transform:uppercase;
+  color:#A3823F;
 }
 .cns-eyebrow::before{
-  content:"";width:7px;height:7px;flex:none;background:var(--vio);
-  border-radius:2px;box-shadow:0 0 10px rgba(139,92,246,.75);
+  content:"";width:7px;height:7px;flex:none;background:var(--oro);
+  border-radius:2px;
 }
 .cns-h2{
-  font-family:'Space Grotesk',ui-monospace,monospace;
+  font-family:'Playfair Display',Georgia,serif;
   font-size:20px;font-weight:700;letter-spacing:.01em;color:var(--ink);
   line-height:1.2;
 }
@@ -141,15 +137,15 @@ const ESTILO_CONSOLA = `
 /* ── Barra superior ── */
 .cns-top{
   position:sticky;top:0;z-index:40;
-  background:linear-gradient(180deg,rgba(4,5,14,.97),rgba(7,10,28,.94));
+  background:rgba(252,250,244,.94);
   backdrop-filter:blur(10px);
-  border-bottom:1px solid rgba(139,92,246,.20);
-  box-shadow:0 10px 30px rgba(2,4,16,.55);
+  border-bottom:1px solid var(--line);
+  box-shadow:0 8px 24px rgba(90,70,40,.08);
 }
 .cns-top::after{
   content:"";display:block;height:2px;
-  background:linear-gradient(90deg,transparent,var(--vio) 16%,var(--cyan) 50%,var(--vio) 84%,transparent);
-  opacity:.85;
+  background:linear-gradient(90deg,transparent 4%,var(--oro-lt) 22%,var(--oro) 50%,var(--oro-lt) 78%,transparent 96%);
+  opacity:.8;
 }
 .cns-top-in{
   max-width:1440px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;
@@ -157,198 +153,216 @@ const ESTILO_CONSOLA = `
 }
 .cns-logo{
   width:42px;height:42px;flex:none;border-radius:12px;display:grid;place-items:center;
-  color:#FFFFFF;background:linear-gradient(150deg,var(--vio) 0%,var(--nv-600) 92%);
-  border:1px solid rgba(196,181,253,.55);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 0 18px rgba(139,92,246,.40);
+  color:#F5E9D2;background:linear-gradient(150deg,var(--marron) 0%,var(--marron-osc) 92%);
+  border:1px solid var(--oro-lt);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 6px 16px rgba(58,44,26,.28);
 }
 .cns-iglesia{
-  font-family:'Space Grotesk',ui-monospace,monospace;font-size:10px;
-  letter-spacing:.24em;text-transform:uppercase;color:var(--cyan-lt);
+  font-family:'Lato',system-ui,sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.24em;text-transform:uppercase;color:#A3823F;
 }
 .cns-titulo{
-  font-family:'Space Grotesk',ui-monospace,monospace;font-size:22px;font-weight:700;
-  letter-spacing:.06em;text-transform:uppercase;color:var(--ink);line-height:1.15;
+  font-family:'Playfair Display',Georgia,serif;font-size:22px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:var(--ink);line-height:1.15;
 }
 .cns-lema{
-  font-family:'Inter',system-ui,sans-serif;font-size:12px;color:var(--ink-mut);
+  font-family:'Lato',system-ui,sans-serif;font-size:12px;color:var(--ink-mut);
 }
 .cns-ver{
-  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;color:var(--vio-lt);
-  border:1px solid var(--line);border-radius:7px;padding:3px 8px;
-  background:rgba(139,92,246,.10);
+  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;color:var(--ink-mut);
+  border:1px solid #E0D5BE;border-radius:7px;padding:3px 8px;
+  background:#FFFFFF;
 }
 
 /* ── Píldoras de estado y leds ── */
 .cns-pill{
   display:inline-flex;align-items:center;gap:7px;border-radius:999px;
   padding:5px 12px;font-size:11px;font-weight:800;letter-spacing:.08em;
-  text-transform:uppercase;border:1px solid var(--line-soft);
-  color:var(--ink-2);background:rgba(7,10,28,.55);white-space:nowrap;
+  text-transform:uppercase;border:1px solid var(--line);
+  color:var(--ink-2);background:#FFFFFF;white-space:nowrap;
 }
-.cns-pill-live{ background:rgba(217,70,239,.14);border-color:rgba(232,121,249,.55);color:#F5D0FE; }
-.cns-pill-danger{ background:rgba(244,63,94,.16);border-color:rgba(251,113,133,.55);color:#FECDD3; }
-.cns-pill-warn{ background:rgba(253,224,71,.12);border-color:rgba(253,224,71,.50);color:var(--warn-lt); }
-.cns-pill-ok{ background:rgba(74,222,128,.12);border-color:rgba(74,222,128,.45);color:#BBF7D0; }
+.cns-pill-live{ background:#F6EFDD;border-color:var(--oro-lt);color:#7A5A28; }
+.cns-pill-danger{ background:#F9EDE8;border-color:rgba(176,69,47,.40);color:#8A3A26; }
+.cns-pill-warn{ background:#F8F0DC;border-color:#E0C98C;color:#8A6A1F; }
+.cns-pill-ok{ background:#EAF0E6;border-color:#C2D0B4;color:#3E6B4A; }
 .cns-pill-dim{ color:var(--ink-mut); }
-.cns-led{ width:8px;height:8px;flex:none;border-radius:999px;background:#5E6C94;box-shadow:0 0 6px rgba(0,0,0,.4); }
-.cns-led-blink{ background:var(--danger-lt);box-shadow:0 0 12px rgba(251,113,133,.85);animation:cns-pulse 1.1s ease-in-out infinite; }
-.cns-led-ok{ background:var(--ok);box-shadow:0 0 12px rgba(74,222,128,.75);animation:cns-pulse 2s ease-in-out infinite; }
+.cns-led{ width:8px;height:8px;flex:none;border-radius:999px;background:#B4A78E; }
+.cns-led-blink{ background:var(--danger);animation:cns-pulse 1.1s ease-in-out infinite; }
+.cns-pill-live .cns-led{ background:#A3823F;animation:cns-pulse 1.1s ease-in-out infinite; }
+.cns-led-ok{ background:var(--ok);animation:cns-pulse 2s ease-in-out infinite; }
 @keyframes cns-pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
 
 /* ── Botones ── */
 .cns .cns-btn-gold{
-  background:linear-gradient(135deg,#8B5CF6 0%,#6366F1 100%);color:#FFFFFF;
-  border:1px solid rgba(196,181,253,.65);font-weight:800;letter-spacing:.03em;
-  box-shadow:0 8px 24px rgba(139,92,246,.38), inset 0 1px 0 rgba(255,255,255,.35);
+  background:linear-gradient(135deg,#7A563A 0%,#5C4327 100%);color:#FFFFFF;
+  border:1px solid rgba(217,196,147,.65);font-weight:800;letter-spacing:.03em;
+  box-shadow:0 6px 18px rgba(92,67,39,.28), inset 0 1px 0 rgba(255,255,255,.18);
 }
-.cns .cns-btn-gold:hover{ background:linear-gradient(135deg,#A78BFA 0%,#818CF8 100%);color:#FFFFFF; }
+.cns .cns-btn-gold:hover{ background:linear-gradient(135deg,#8A6444 0%,#6B4E30 100%);color:#FFFFFF; }
 .cns .cns-btn-line{
-  background:rgba(7,10,28,.5);border:1px solid var(--vio-soft);
-  color:var(--vio-lt);font-weight:700;
+  background:#FFFFFF;border:1px solid #D5C7A9;
+  color:var(--marron);font-weight:700;
 }
-.cns .cns-btn-line:hover{ background:var(--vio-dim);border-color:var(--vio);color:#EDE9FE; }
+.cns .cns-btn-line:hover{ background:#F6EFDD;border-color:#C9B68C;color:#5C4327; }
 .cns .cns-btn-ghost{ color:var(--ink-mut); }
-.cns .cns-btn-ghost:hover{ background:var(--vio-dim);color:var(--vio-lt); }
+.cns .cns-btn-ghost:hover{ background:var(--paper-2);color:#5C4327; }
 .cns .cns-icobtn{ color:var(--ink-mut); }
-.cns .cns-icobtn:hover{ background:var(--vio-dim);color:var(--vio-lt); }
+.cns .cns-icobtn:hover{ background:var(--paper-2);color:#5C4327; }
 
-/* ── Canales de la secuencia (tira compacta, se arrastra con el cursor) ── */
-.cns-seq{ touch-action:pan-y; }
-.cns-seq.dragging{ cursor:grabbing;user-select:none; }
-.cns-chip{
-  position:relative;width:158px;flex:none;display:flex;align-items:center;gap:8px;
-  border-radius:10px;border:1px solid var(--line-soft);
-  background:linear-gradient(180deg,rgba(18,23,53,.45),rgba(7,10,28,.55));
-  padding:6px 8px;cursor:pointer;
+/* ── Orden del culto: cajas grandes en vertical con conectores ── */
+.cns-box{
+  position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;gap:12px;
+  border-radius:14px;border:1px solid var(--line);
+  background:var(--card);padding:13px 14px 13px 12px;cursor:pointer;
+  box-shadow:0 1px 2px rgba(90,70,40,.05), 0 5px 14px rgba(90,70,40,.05);
   transition:border-color .25s ease-in-out,box-shadow .25s ease-in-out;
 }
-.cns-chip:hover{ border-color:var(--vio-soft); }
-.cns-chip-done{ opacity:.5; }
-.cns-chip-now{
-  border-color:rgba(168,85,247,.80);
-  background:linear-gradient(180deg,rgba(139,92,246,.18),rgba(7,10,28,.55));
-  animation:cns-glow 2.6s ease-in-out infinite;
+.cns-box:hover{
+  border-color:#D3C5A8;
+  box-shadow:0 2px 4px rgba(90,70,40,.06), 0 8px 20px rgba(90,70,40,.09);
 }
-@keyframes cns-glow{
-  0%,100%{ box-shadow:0 0 0 1px rgba(139,92,246,.40),0 0 24px rgba(139,92,246,.16); }
-  50%{ box-shadow:0 0 0 1px rgba(168,85,247,.60),0 0 34px rgba(139,92,246,.30); }
+.cns-box-done{ opacity:.55; }
+.cns-box-done .cns-box-title{ text-decoration:line-through; }
+.cns-box-now{
+  border-color:var(--oro);
+  background:linear-gradient(180deg,#FFFDF6 0%,#FFFFFF 100%);
+  box-shadow:0 0 0 1px var(--oro-lt), 0 10px 26px rgba(176,141,87,.22);
 }
-.cns-chip-num{
-  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:11px;font-weight:700;
-  color:var(--cyan-lt);
+.cns-box-num{
+  width:34px;height:34px;flex:none;display:grid;place-items:center;
+  border-radius:10px;border:1px solid var(--line);
+  background:var(--paper);color:var(--marron);
+  font-family:'Roboto Mono',ui-monospace,monospace;font-size:13px;font-weight:700;
 }
-.cns-chip-min{
-  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:21px;font-weight:700;
-  color:var(--vio-lt);line-height:1;
+.cns-box-now .cns-box-num{ background:#F6EFDD;border-color:var(--oro-lt);color:#7A5A28; }
+.cns-box-title{
+  font-size:15.5px;font-weight:700;color:var(--ink);letter-spacing:.01em;line-height:1.25;
 }
-.cns-chip-minlab{
-  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:8px;
-  letter-spacing:.18em;text-transform:uppercase;color:var(--ink-mut);
+.cns-box-speaker{ font-size:11.5px;font-weight:400;color:var(--ink-mut); }
+.cns-tipo{
+  display:inline-flex;align-items:center;border-radius:999px;
+  padding:2.5px 9px;font-size:9.5px;font-weight:900;
+  letter-spacing:.14em;text-transform:uppercase;border:1px solid;
+  white-space:nowrap;
 }
-.cns-chip-title{ font-size:12px;font-weight:800;color:var(--ink); }
+.cns-tipo-inicio{ background:#F6EFDD;border-color:#E0CFA8;color:#7A5A28; }
+.cns-tipo-sermon{ background:#F0E7DA;border-color:#D8C4A8;color:#5C4327; }
+.cns-tipo-ninos{ background:#EBEFE3;border-color:#C9D4BA;color:#4E6647; }
+.cns-tipo-general{ background:#F3EFE6;border-color:#DED4C0;color:#6B5844; }
+.cns-connector{ position:relative;height:34px; }
+.cns-connector::before{
+  content:"";position:absolute;left:28px;top:2px;bottom:2px;width:2px;
+  border-radius:2px;background:#DCD0B6;
+}
+.cns-connector-pill{
+  position:absolute;left:28px;top:50%;transform:translate(-50%,-50%);z-index:1;
+  display:inline-flex;align-items:center;
+  background:var(--card);border:1px solid #E0D5BE;border-radius:999px;
+  padding:3px 10px;
+  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700;
+  color:var(--marron);box-shadow:0 1px 3px rgba(90,70,40,.10);white-space:nowrap;
+}
+.cns-box-add{
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  border-radius:14px;border:1.5px dashed #D3C5A8;background:transparent;
+  padding:12px 14px;margin-top:2px;
+  font-size:12.5px;font-weight:700;color:var(--ink-mut);
+  transition:border-color .25s ease-in-out,color .25s ease-in-out,background .25s ease-in-out;
+}
+.cns-box-add:hover{ border-color:var(--oro);color:var(--marron);background:var(--oro-dim); }
 
 /* ── Menú de los tres puntitos ── */
 .cns-menu{
   position:absolute;top:calc(100% + 4px);right:2px;z-index:60;min-width:168px;
   width:max-content;max-width:min(260px,92vw);
-  border-radius:12px;border:1px solid var(--line);background:#0E1230;
-  box-shadow:0 18px 40px rgba(2,4,16,.65), 0 0 26px rgba(139,92,246,.12);
+  border-radius:12px;border:1px solid #E0D5BE;background:#FFFFFF;
+  box-shadow:0 18px 40px rgba(60,45,25,.20);
   padding:4px;display:flex;flex-direction:column;
 }
 .cns-menu button{
   display:block;border-radius:8px;padding:7px 10px;
   font-size:12.5px;font-weight:700;color:var(--ink-2);text-align:left;
 }
-.cns-menu button:hover{ background:var(--vio-dim);color:var(--vio-lt); }
+.cns-menu button:hover{ background:var(--paper-2);color:#5C4327; }
 .cns-menu button:disabled{ opacity:.35;pointer-events:none; }
 
 /* ── Etiquetas chiquitas de los ajustes en línea ── */
 .cns-setlab{
-  font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;
+  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mut);
 }
 
 /* ── Reloj y medidor ── */
 .cns-timer{
-  font-family:'JetBrains Mono',ui-monospace,monospace;font-weight:700;
+  font-family:'Roboto Mono',ui-monospace,monospace;font-weight:700;
   letter-spacing:-0.01em;line-height:.95;
 }
 .cns-timer-label{
-  font-family:'Space Grotesk',ui-monospace,monospace;font-size:10px;
-  letter-spacing:.3em;text-transform:uppercase;color:var(--cyan-lt);text-align:center;
+  font-family:'Lato',system-ui,sans-serif;font-size:10px;font-weight:900;
+  letter-spacing:.3em;text-transform:uppercase;color:#A3823F;text-align:center;
 }
 .cns-kbd{
-  display:inline-block;font-family:'JetBrains Mono',ui-monospace,monospace;font-size:10px;
-  border:1px solid var(--line-soft);border-bottom-width:2px;border-radius:5px;
-  padding:1px 6px;background:rgba(7,10,28,.6);color:var(--ink-2);
+  display:inline-block;font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;
+  border:1px solid #E0D5BE;border-bottom-width:2px;border-radius:5px;
+  padding:1px 6px;background:#FAF6EC;color:var(--ink-2);
 }
 .cns-alert-danger{
   display:flex;gap:10px;align-items:flex-start;border-radius:12px;
-  border:1px solid rgba(251,113,133,.45);background:rgba(244,63,94,.12);
-  padding:12px 14px;font-size:13px;color:#FECDD3;
+  border:1px solid rgba(176,69,47,.35);background:#F9EDE8;
+  padding:12px 14px;font-size:13px;color:#7C3A26;
 }
 
 /* ── Campos ── */
 .cns .cns-in, .cns-modal .cns-in{
-  background:rgba(4,6,18,.68);border:1px solid var(--line-soft);
+  background:#FFFFFF;border:1px solid #DCD2BE;
   color:var(--ink) !important;border-radius:10px;
 }
-.cns .cns-in::placeholder, .cns-modal .cns-in::placeholder{ color:#66739B; }
+.cns .cns-in::placeholder, .cns-modal .cns-in::placeholder{ color:#A89878; }
 .cns .cns-in:focus-visible, .cns-modal .cns-in:focus-visible,
 .cns .cns-in:focus, .cns-modal .cns-in:focus{
-  border-color:var(--vio-soft);box-shadow:0 0 0 3px rgba(139,92,246,.16);
+  border-color:#C9B68C;box-shadow:0 0 0 3px rgba(176,141,87,.20);
 }
 .cns button[role="switch"], .cns-modal button[role="switch"]{
-  border-color:var(--line-soft);
+  border-color:#DCD2BE;
 }
 .cns button[role="switch"][data-state="unchecked"],
 .cns-modal button[role="switch"][data-state="unchecked"]{
-  background:rgba(4,6,18,.7) !important;border-color:var(--line-soft) !important;
+  background:#DDD3BC !important;border-color:#CFC3A8 !important;
 }
 .cns button[role="switch"][data-state="checked"],
 .cns-modal button[role="switch"][data-state="checked"]{
-  background:var(--vio) !important;border-color:var(--vio) !important;
-  box-shadow:0 0 12px rgba(139,92,246,.45);
+  background:var(--marron) !important;border-color:var(--marron) !important;
 }
 .cns button[role="switch"] > span, .cns-modal button[role="switch"] > span{
-  background:#E8ECF9 !important;
+  background:#FFFFFF !important;
 }
 .cns button[role="switch"][data-state="checked"] > span,
 .cns-modal button[role="switch"][data-state="checked"] > span{
-  background:#0C1028 !important;
+  background:#FFFFFF !important;
 }
 
 /* ── Modales y desplegables (se renderizan fuera de .cns, en un portal) ── */
 .cns-modal{
-  background:linear-gradient(180deg,#0E1230,#090C22);
-  border:1px solid var(--line);color:var(--ink);border-radius:16px;
-  box-shadow:0 30px 70px rgba(2,4,16,.75), 0 0 40px rgba(139,92,246,.10);
+  background:linear-gradient(180deg,#FFFFFF,#FBF7EE);
+  border:1px solid #E0D5BE;color:var(--ink);border-radius:16px;
+  box-shadow:0 30px 70px rgba(60,45,25,.30);
 }
 .cns-modal label{ color:var(--ink-2) !important;font-weight:700; }
 .cns-modal .text-muted-foreground{ color:var(--ink-mut) !important; }
 .cns-modal [data-slot="dialog-close"], .cns-modal button.dialog-close{ color:var(--ink-mut); }
 .cns-pop{
-  background:#0E1230;border:1px solid var(--line);border-radius:12px;
-  color:var(--ink);box-shadow:0 18px 40px rgba(2,4,16,.65);
-  font-family:'Inter','Segoe UI',system-ui,sans-serif;
+  background:#FFFFFF;border:1px solid #E0D5BE;border-radius:12px;
+  color:var(--ink);box-shadow:0 18px 40px rgba(60,45,25,.20);
+  font-family:'Lato','Segoe UI',system-ui,sans-serif;
 }
 .cns-pop [role="option"]{ color:var(--ink-2) !important; }
-.cns-pop [role="option"][data-highlighted]{ background:var(--vio-dim);color:var(--vio-lt); }
+.cns-pop [role="option"][data-highlighted]{ background:var(--paper-2);color:#5C4327; }
 
 /* ── Detalles ── */
-.cns-bezel{
-  border-radius:14px;padding:8px;background:#02030A;
-  border:1px solid var(--line-soft);
-  box-shadow:inset 0 0 0 1px rgba(167,139,250,.08),0 10px 26px rgba(0,0,0,.6), 0 0 30px rgba(139,92,246,.08);
-}
-.cns-tag{
-  display:inline-flex;align-items:center;gap:6px;border-radius:999px;
-  border:1px solid var(--vio-soft);background:var(--vio-dim);
-  color:var(--vio-lt);padding:4px 10px;font-size:11px;white-space:nowrap;
-}
 .cns-sep{ height:1px;background:var(--line-soft); }
 .cns-note{
-  border:1px solid var(--line-soft);background:rgba(139,92,246,.07);
+  border:1px solid var(--line);background:var(--paper);
   border-radius:12px;padding:12px 14px;font-size:13px;color:var(--ink-2);
 }
 .cns-rise{ animation:cns-rise .28s ease-in-out both; }
@@ -361,8 +375,41 @@ const ESTILO_CONSOLA = `
 }
 `;
 
+/* ──────────── Tipo de momento (deducido del título) ──────────── */
+
+/** Etiqueta del bloque al que pertenece el momento, deducida del título:
+    inicio, escuela sabática, sermón de niños, sermón (adultos), alabanza,
+    ofrenda, oración, avisos… Sirve para distinguir de un golpe de vista
+    las partes del culto en el orden vertical. */
+function tipoDeMomento(titulo: string): { label: string; tone: string } {
+  const t = titulo
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+  if (/nin[oa]/.test(t)) {
+    return /sermon|predic|mensaje|palabra|reflexion/.test(t)
+      ? { label: "Sermón niños", tone: "cns-tipo-ninos" }
+      : { label: "Niños", tone: "cns-tipo-ninos" };
+  }
+  if (/sermon|predic|mensaje|palabra|reflexion/.test(t)) {
+    return { label: "Sermón adultos", tone: "cns-tipo-sermon" };
+  }
+  if (/escuela/.test(t)) return { label: "Escuela sabática", tone: "cns-tipo-inicio" };
+  if (/inicio|bienvenida|entrada|apertura|intro/.test(t)) {
+    return { label: "Inicio", tone: "cns-tipo-inicio" };
+  }
+  if (/alabanz|adoracion|himno|canto|musica/.test(t)) {
+    return { label: "Alabanza", tone: "cns-tipo-general" };
+  }
+  if (/ofrend/.test(t)) return { label: "Ofrenda", tone: "cns-tipo-general" };
+  if (/oracion/.test(t)) return { label: "Oración", tone: "cns-tipo-general" };
+  if (/aviso|anunci/.test(t)) return { label: "Avisos", tone: "cns-tipo-general" };
+  if (/bendic/.test(t)) return { label: "Bendición", tone: "cns-tipo-general" };
+  return { label: "Momento", tone: "cns-tipo-general" };
+}
+
 export default function PanelView() {
-  const { state, mutate, peerOnline, bibliaProyectada } = useShowChannel("panel");
+  const { state, mutate, peerOnline } = useShowChannel("panel");
   const now = useNow(500);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [msgDraft, setMsgDraft] = useState("");
@@ -370,74 +417,18 @@ export default function PanelView() {
   const [menuIdx, setMenuIdx] = useState<number | null>(null);
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 });
 
-  /* ── Secuencia: arrastre con el cursor y rueda del mouse ── */
-  const seqRef = useRef<HTMLDivElement | null>(null);
-  const dragStateRef = useRef({ activo: false, moved: false, startX: 0, startScroll: 0 });
-  useEffect(() => {
-    const el = seqRef.current;
-    if (!el) return;
-    const down = (e: PointerEvent) => {
-      if (e.button !== 0) return;
-      dragStateRef.current = { activo: true, moved: false, startX: e.clientX, startScroll: el.scrollLeft };
-    };
-    const move = (e: PointerEvent) => {
-      const d = dragStateRef.current;
-      if (!d.activo) return;
-      const dx = e.clientX - d.startX;
-      if (Math.abs(dx) > 5) {
-        d.moved = true;
-        el.classList.add("dragging");
-        try {
-          el.setPointerCapture(e.pointerId);
-        } catch {
-          /* sin captura: igual arrastra mientras el botón esté apretado */
-        }
-        el.scrollLeft = d.startScroll - dx;
-      }
-    };
-    const up = (e: PointerEvent) => {
-      const d = dragStateRef.current;
-      if (!d.activo) return;
-      d.activo = false;
-      el.classList.remove("dragging");
-      try {
-        if (el.hasPointerCapture(e.pointerId)) el.releasePointerCapture(e.pointerId);
-      } catch {
-        /* nada que soltar */
-      }
-    };
-    const wheel = (e: WheelEvent) => {
-      if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
-        e.preventDefault();
-        el.scrollLeft += e.deltaY;
-      }
-    };
-    el.addEventListener("pointerdown", down);
-    el.addEventListener("pointermove", move);
-    el.addEventListener("pointerup", up);
-    el.addEventListener("pointercancel", up);
-    el.addEventListener("wheel", wheel, { passive: false });
-    return () => {
-      el.removeEventListener("pointerdown", down);
-      el.removeEventListener("pointermove", move);
-      el.removeEventListener("pointerup", up);
-      el.removeEventListener("pointercancel", up);
-      el.removeEventListener("wheel", wheel);
-    };
-  }, []);
-
   const stateRef = useRef(state);
   useEffect(() => {
     stateRef.current = state;
   }, [state]);
 
-  /* Auto-scroll de la secuencia horizontal: centra el momento en curso */
+  /* Auto-scroll del orden del culto: centra el momento en curso */
   const currentChipRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     currentChipRef.current?.scrollIntoView({
       behavior: "smooth",
-      inline: "center",
-      block: "nearest",
+      inline: "nearest",
+      block: "center",
     });
   }, [state.currentIndex]);
 
@@ -622,22 +613,12 @@ export default function PanelView() {
 
   const editingSeg = state.segments.find((x) => x.id === editingId) ?? null;
 
-  /* Espejo de la letra bíblica que proyecta la pantalla del predicador.
-     La pantalla del predicador lo publica por el canal; se considera
-     válido si llegó hace menos de 10 segundos (si esa ventana se cerró,
-     la mini pantalla vuelve al culto solo). */
-  const bibliaViva = useMemo(() => {
-    if (!bibliaProyectada) return null;
-    if (now > 0 && Date.now() - bibliaProyectada.ts > 10000) return null;
-    return bibliaProyectada;
-  }, [bibliaProyectada, now]);
-
   const counterColor =
     phase === "overtime"
-      ? "text-[#FB7185]"
+      ? "text-[#B0452F]"
       : phase === "warning"
-        ? "text-[#FEF08A]"
-        : "text-[#F2F4FF]";
+        ? "text-[#B98A2F]"
+        : "text-[#241E16]";
 
   const statusPill = (() => {
     if (state.status === "finished") {
@@ -779,170 +760,171 @@ export default function PanelView() {
       </header>
 
       <main className="mx-auto flex w-full max-w-[1440px] min-h-0 flex-1 flex-col gap-3 px-4 py-3">
-        {/* ═══ Secuencia del culto: tira compacta (arrastrable con el cursor) ═══ */}
-        <section className="cns-panel cns-rise shrink-0">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5">
-            <div className="cns-eyebrow">Programa</div>
-            <h2 className="cns-h2 text-base">Secuencia del culto</h2>
-            <p className="cns-sub min-w-0 flex-1 truncate">
-              {state.segments.length} momentos · {fmtMin(totalMin)} · un clic salta
-              al momento · doble clic lo edita
-            </p>
-            <Button
-              size="sm"
-              variant="ghost"
-              className="cns-btn-ghost ml-auto h-7 shrink-0 text-xs"
-              title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
-              aria-label="Cargar plantilla sabática"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
-                  )
-                ) {
-                  mutate((p) => ({ ...p, segments: defaultSegments() }));
-                }
-              }}
-            >
-              <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
-            </Button>
-          </div>
-          <div className="px-3 pb-2 pt-1.5">
-            <div
-              ref={seqRef}
-              className="cns-seq scrollbar-thin flex gap-2 overflow-x-auto pb-1"
-            >
-              {state.segments.map((x, i) => {
-                const isCurrent =
-                  i === state.currentIndex && state.status !== "finished";
-                const isDone = state.currentIndex >= 0 && i < state.currentIndex;
-                return (
-                  <div
-                    key={x.id}
-                    ref={isCurrent ? currentChipRef : undefined}
-                    onClick={() => {
-                      if (dragStateRef.current.moved) {
-                        dragStateRef.current.moved = false;
-                        return;
-                      }
-                      if (i !== state.currentIndex) mutate((p) => jumpTo(p, i));
-                      setMenuIdx(null);
-                    }}
-                    onDoubleClick={() => setEditingId(x.id)}
-                    title="Un clic: saltar a este momento · doble clic: editarlo"
-                    className={cn(
-                      "cns-chip",
-                      isCurrent && "cns-chip-now",
-                      isDone && "cns-chip-done",
-                    )}
-                  >
-                    <span className="cns-chip-num w-4 shrink-0 text-center">
-                      {i + 1}
-                    </span>
-                    <span className="flex shrink-0 flex-col items-center leading-none">
-                      <span className="cns-chip-min">{x.minutes}</span>
-                      <span className="cns-chip-minlab mt-0.5">min</span>
-                    </span>
-                    <span
-                      className={cn(
-                        "cns-chip-title min-w-0 flex-1 truncate",
-                        isDone && "line-through opacity-60",
-                      )}
-                    >
-                      {x.title}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Más opciones de ${x.title}`}
-                      title="Más opciones"
-                      className="cns-icobtn grid h-7 w-7 shrink-0 place-items-center rounded-md"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        const r = e.currentTarget.getBoundingClientRect();
-                        setMenuPos({ x: r.right, y: r.bottom + 4 });
-                        setMenuIdx(menuIdx === i ? null : i);
-                      }}
-                    >
-                      <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
-                    </button>
-                    {menuIdx === i
-                      ? createPortal(
-                          <div
-                            className="cns-menu"
-                            style={{
-                              position: "fixed",
-                              top: menuPos.y,
-                              left: menuPos.x,
-                              transform: "translateX(-100%)",
-                            }}
-                            onClick={(e2) => e2.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setEditingId(x.id);
-                                setMenuIdx(null);
-                              }}
-                            >
-                              Editar momento
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                mutate((p) => jumpTo(p, i));
-                                setMenuIdx(null);
-                              }}
-                            >
-                              Ir a este momento
-                            </button>
-                            <button
-                              type="button"
-                              disabled={i === 0}
-                              onClick={() => {
-                                moveSegment(i, -1);
-                                setMenuIdx(null);
-                              }}
-                            >
-                              Subir
-                            </button>
-                            <button
-                              type="button"
-                              disabled={i === state.segments.length - 1}
-                              onClick={() => {
-                                moveSegment(i, 1);
-                                setMenuIdx(null);
-                              }}
-                            >
-                              Bajar
-                            </button>
-                          </div>,
-                          document.body,
-                        )
-                      : null}
-                  </div>
-                );
-              })}
-              <button
-                type="button"
-                onClick={addSegment}
-                aria-label="Agregar momento"
-                className="cns-chip w-[158px] shrink-0 cursor-pointer justify-center gap-1.5 border-dashed py-2 text-[#7E8CB0]"
+        <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(330px,380px)]">
+          {/* ═══ Orden del culto: cajas grandes en vertical; entre bloque y
+                 bloque, el lapso en minutos como conector ═══ */}
+          <section className="cns-panel cns-rise order-2 flex min-h-0 flex-col lg:order-1">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 pt-2.5">
+              <div className="cns-eyebrow">Programa</div>
+              <h2 className="cns-h2 text-base">Orden del culto</h2>
+              <p className="cns-sub min-w-0 flex-1 truncate">
+                {state.segments.length} momentos · {fmtMin(totalMin)} · un clic salta
+                al momento · doble clic lo edita
+              </p>
+              <Button
+                size="sm"
+                variant="ghost"
+                className="cns-btn-ghost ml-auto h-7 shrink-0 text-xs"
+                title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
+                aria-label="Cargar plantilla sabática"
+                onClick={() => {
+                  if (
+                    window.confirm(
+                      "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
+                    )
+                  ) {
+                    mutate((p) => ({ ...p, segments: defaultSegments() }));
+                  }
+                }}
               >
-                <Plus className="h-4 w-4 text-[#A855F7]" aria-hidden="true" />
-                <span className="text-xs font-bold">Agregar</span>
-              </button>
+                <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
+              </Button>
             </div>
-          </div>
-        </section>
+            <div className="scrollbar-thin min-h-0 flex-1 overflow-y-auto px-3.5 pb-3 pt-2.5">
+              <div className="flex flex-col">
+                {state.segments.map((x, i) => {
+                  const isCurrent =
+                    i === state.currentIndex && state.status !== "finished";
+                  const isDone = state.currentIndex >= 0 && i < state.currentIndex;
+                  const tipo = tipoDeMomento(x.title);
+                  return (
+                    <Fragment key={x.id}>
+                      <div
+                        ref={isCurrent ? currentChipRef : undefined}
+                        onClick={() => {
+                          if (i !== state.currentIndex) mutate((p) => jumpTo(p, i));
+                          setMenuIdx(null);
+                        }}
+                        onDoubleClick={() => setEditingId(x.id)}
+                        title="Un clic: saltar a este momento · doble clic: editarlo"
+                        className={cn(
+                          "cns-box",
+                          isCurrent && "cns-box-now",
+                          isDone && "cns-box-done",
+                        )}
+                      >
+                        <span className="cns-box-num">{i + 1}</span>
+                        <span className="min-w-0 flex-1">
+                          <span className="cns-box-title block truncate">
+                            {x.title}
+                          </span>
+                          <span className="mt-1 flex min-w-0 items-center gap-2">
+                            <span className={cn("cns-tipo", tipo.tone)}>
+                              {tipo.label}
+                            </span>
+                            {x.speaker ? (
+                              <span className="cns-box-speaker truncate">
+                                {x.speaker}
+                              </span>
+                            ) : null}
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Más opciones de ${x.title}`}
+                          title="Más opciones"
+                          className="cns-icobtn grid h-8 w-8 shrink-0 place-items-center rounded-lg"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const r = e.currentTarget.getBoundingClientRect();
+                            setMenuPos({ x: r.right, y: r.bottom + 4 });
+                            setMenuIdx(menuIdx === i ? null : i);
+                          }}
+                        >
+                          <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
+                        </button>
+                        {menuIdx === i
+                          ? createPortal(
+                              <div
+                                className="cns-menu"
+                                style={{
+                                  position: "fixed",
+                                  top: menuPos.y,
+                                  left: menuPos.x,
+                                  transform: "translateX(-100%)",
+                                }}
+                                onClick={(e2) => e2.stopPropagation()}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setEditingId(x.id);
+                                    setMenuIdx(null);
+                                  }}
+                                >
+                                  Editar momento
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    mutate((p) => jumpTo(p, i));
+                                    setMenuIdx(null);
+                                  }}
+                                >
+                                  Ir a este momento
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={i === 0}
+                                  onClick={() => {
+                                    moveSegment(i, -1);
+                                    setMenuIdx(null);
+                                  }}
+                                >
+                                  Subir
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={i === state.segments.length - 1}
+                                  onClick={() => {
+                                    moveSegment(i, 1);
+                                    setMenuIdx(null);
+                                  }}
+                                >
+                                  Bajar
+                                </button>
+                              </div>,
+                              document.body,
+                            )
+                          : null}
+                      </div>
+                      {/* El lapso hasta el próximo bloque: los minutos de este
+                          momento, como conector de la línea de tiempo */}
+                      <div className="cns-connector" aria-hidden="true">
+                        <span className="cns-connector-pill">{x.minutes} min</span>
+                      </div>
+                    </Fragment>
+                  );
+                })}
+                <button
+                  type="button"
+                  onClick={addSegment}
+                  aria-label="Agregar momento"
+                  className="cns-box-add shrink-0 cursor-pointer"
+                >
+                  <Plus className="h-4 w-4" aria-hidden="true" /> Agregar momento
+                </button>
+              </div>
+            </div>
+          </section>
 
-        <div className="grid min-h-0 flex-1 gap-2.5 lg:grid-cols-[minmax(0,1fr)_minmax(320px,340px)]">
-          {/* ═══ Columna central (arriba en móvil) ═══ */}
-          <div className="scrollbar-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto">
+          {/* ═══ Columna derecha: mesa de control + mensajes ═══ */}
+          <div className="order-1 flex min-h-0 flex-col gap-2.5 overflow-y-auto scrollbar-thin lg:order-2">
             {/* ── Mesa de control: el momento en curso ── */}
             <section
               className={cn(
                 "cns-panel cns-rise shrink-0",
-                active && "border-[rgba(139,92,246,0.35)]",
+                active && "cns-panel-active",
               )}
             >
               <div className="flex items-center justify-between gap-2 px-4 pt-2.5">
@@ -1022,24 +1004,43 @@ export default function PanelView() {
                       </div>
                     </div>
 
-                    {/* Medidor VU */}
+                    {/* Medidor de avance */}
                     <Progress
                       value={totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0}
                       className={cn(
-                        "mt-2 h-1.5 bg-black/50",
+                        "mt-2 h-1.5 bg-[#EDE4D0]",
                         phase === "overtime"
-                          ? "[&>div]:bg-[#FB7185]"
+                          ? "[&>div]:bg-[#B0452F]"
                           : phase === "warning"
-                            ? "[&>div]:bg-[#FEF08A]"
-                            : "[&>div]:bg-[#A855F7]",
+                            ? "[&>div]:bg-[#C08A2E]"
+                            : "[&>div]:bg-[#7A5A3A]",
                       )}
                     />
-                    <div className="mt-1 flex items-center justify-between font-mono text-[10px] tracking-[0.18em] text-muted-foreground">
-                      <span>
-                        TRANSCURRIDO {fmtHMS(Math.floor(elapsed / 1000))}
-                      </span>
-                      <span>RESTANTE CULTO {fmtMin(plannedRemain)}</span>
-                      <span>PLANIFICADO {seg?.minutes} MIN</span>
+                    <div className="mt-1.5 grid grid-cols-3 gap-1 text-center font-mono text-muted-foreground">
+                      <div className="min-w-0">
+                        <div className="text-[9px] tracking-[0.14em]">
+                          TRANSCURRIDO
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                          {fmtHMS(Math.floor(elapsed / 1000))}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[9px] tracking-[0.14em]">
+                          RESTANTE CULTO
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                          {fmtMin(plannedRemain)}
+                        </div>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-[9px] tracking-[0.14em]">
+                          PLANIFICADO
+                        </div>
+                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                          {seg?.minutes} MIN
+                        </div>
+                      </div>
                     </div>
 
                     {phase === "overtime" ? (
@@ -1054,7 +1055,7 @@ export default function PanelView() {
                       </div>
                     ) : null}
 
-                    {/* Controles de la consola: una sola fila */}
+                    {/* Controles de la consola: dos filas compactas */}
                     <div className="mt-2.5 flex gap-1.5">
                       <Button
                         className={cn(
@@ -1078,15 +1079,17 @@ export default function PanelView() {
                       </Button>
                       <Button
                         variant="outline"
-                        className="cns-btn-line h-9 shrink-0 text-xs"
+                        className="cns-btn-line h-9 min-w-0 flex-1 text-xs"
                         onClick={doAdvance}
                       >
                         <SkipForward className="h-4 w-4" aria-hidden="true" />{" "}
                         Siguiente
                       </Button>
+                    </div>
+                    <div className="mt-1.5 flex gap-1.5">
                       <Button
                         variant="ghost"
-                        className="cns-btn-ghost h-9 w-9 shrink-0"
+                        className="cns-btn-ghost h-9 min-w-0 flex-1 justify-center"
                         title="Reiniciar el cronómetro de este momento (R)"
                         aria-label="Reiniciar el cronómetro de este momento"
                         onClick={doReset}
@@ -1095,7 +1098,7 @@ export default function PanelView() {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="cns-btn-ghost h-9 w-9 shrink-0"
+                        className="cns-btn-ghost h-9 min-w-0 flex-1 justify-center"
                         title="Momento anterior"
                         aria-label="Momento anterior"
                         onClick={doBack}
@@ -1104,7 +1107,7 @@ export default function PanelView() {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="cns-btn-ghost h-9 shrink-0 text-xs"
+                        className="cns-btn-ghost h-9 min-w-0 flex-[1.4] justify-center text-xs"
                         title="Restar 1 minuto al momento"
                         onClick={() => adjustMinutes(-1)}
                       >
@@ -1112,7 +1115,7 @@ export default function PanelView() {
                       </Button>
                       <Button
                         variant="ghost"
-                        className="cns-btn-ghost h-9 shrink-0 text-xs"
+                        className="cns-btn-ghost h-9 min-w-0 flex-[1.4] justify-center text-xs"
                         title="Sumar 1 minuto al momento"
                         onClick={() => adjustMinutes(1)}
                       >
@@ -1121,9 +1124,9 @@ export default function PanelView() {
                     </div>
 
                     {seg && seg.cards ? (
-                      <div className="mt-3 space-y-2 rounded-xl border-2 border-dashed border-[rgba(139,92,246,0.45)] bg-[rgba(139,92,246,0.08)] p-2.5">
+                      <div className="mt-3 space-y-2 rounded-xl border-2 border-dashed border-[rgba(176,141,87,0.45)] bg-[rgba(176,141,87,0.08)] p-2.5">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#C4B5FD]">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#8A6A30]">
                             Tarjeta en pantalla · editable
                           </div>
                           <Switch
@@ -1178,7 +1181,7 @@ export default function PanelView() {
                         </div>
                       </div>
                     ) : seg ? (
-                      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[rgba(143,160,184,0.35)] bg-black/20 p-2.5">
+                      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#DCD2BE] bg-[#F6F1E6] p-2.5">
                         <div className="min-w-0">
                           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                             Tarjeta en pantalla
@@ -1269,31 +1272,6 @@ export default function PanelView() {
                   >
                     <Send className="h-4 w-4" aria-hidden="true" />
                   </Button>
-                </div>
-              </div>
-            </section>
-          </div>
-
-          {/* ═══ Columna derecha ═══ */}
-          <div className="scrollbar-thin flex min-h-0 flex-col gap-2.5 overflow-y-auto">
-            {/* ── Monitor de salida (mini pantalla en vivo) ── */}
-            <section className="cns-panel cns-rise shrink-0">
-              <div className="px-4 pt-2.5">
-                <div className="cns-eyebrow">
-                  <MonitorSpeaker
-                    className="h-3.5 w-3.5"
-                    aria-hidden="true"
-                  />{" "}
-                  Monitor de salida · pantalla del predicador
-                </div>
-              </div>
-              <div className="p-2.5">
-                <div
-                  title="Abrir la pantalla del predicador"
-                  onClick={openPreacherWindow}
-                  className="cns-bezel cursor-pointer"
-                >
-                  <MiniPantalla state={state} now={now} biblia={bibliaViva} />
                 </div>
               </div>
             </section>
@@ -1423,7 +1401,7 @@ function SegmentEditor({
         </Select>
       </div>
 
-      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "rgba(140,165,200,.18)" }}>
+      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "rgba(180,160,120,.35)" }}>
         <div className="min-w-0">
           <Label htmlFor={`c-${seg.id}`} className="text-xs font-medium">
             Tarjeta grande en pantalla
@@ -1539,7 +1517,7 @@ function SegmentEditor({
             <Button
               size="sm"
               variant="ghost"
-              className="text-[#FB7185] hover:text-[#FB7185]"
+              className="text-[#B0452F] hover:text-[#B0452F]"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar
@@ -1581,11 +1559,12 @@ function HelpDialog() {
             y proyectala al monitor o TV de la iglesia.
           </li>
           <li>
-            Volvé a esta ventana y manejá el culto desde la <b>secuencia horizontal</b>{" "}
-            de arriba: la tira se <b>arrastra con el cursor</b> (o con la rueda del
-            mouse), un <b>clic</b> salta a un momento y un <b>doble clic</b> lo edita
-            (también con los <b>tres puntitos</b>). Mensajes al orador en la columna de
-            la derecha.
+            Volvé a esta ventana y manejá el culto desde el <b>orden del culto</b> en
+            vertical: la lista se <b>desplaza con la rueda del mouse</b>, un{" "}
+            <b>clic</b> salta a un momento y un <b>doble clic</b> lo edita (también
+            con los <b>tres puntitos</b>). Entre bloque y bloque se ve el{" "}
+            <b>lapso en minutos</b> de cada momento, como conectores de la línea de
+            tiempo. Mensajes al orador en la columna de la derecha.
           </li>
         </ol>
         <div className="cns-sep" />
@@ -1612,11 +1591,6 @@ function HelpDialog() {
             no), sin títulos ni leyendas.
           </li>
           <li>
-            · La <b>mini pantalla</b> de la columna derecha muestra en vivo lo que
-            se ve en la pantalla del predicador (letra bíblica, tarjeta, contador
-            y mensajes).
-          </li>
-          <li>
             · El contador pasa de claro a ámbar en los minutos finales y a rojo
             cuando se cumple el tiempo.
           </li>
@@ -1624,410 +1598,5 @@ function HelpDialog() {
         </ul>
       </DialogContent>
     </Dialog>
-  );
-}
-
-/* ────────────── Mini pantalla del predicador (incrustada) ────────────── */
-
-/* Tamaño de diseño de la mini pantalla: 320×180 (16:9). Todo lo de adentro
-   se dibuja en píxeles de este espacio y después se escala al ancho real de
-   la tarjeta, así la replica se ve igual en cualquier ancho de columna. */
-const MINI_ANCHO = 320;
-const MINI_ALTO = 180;
-
-/** Mide el ancho disponible y devuelve cuánto hay que escalar el diseño. */
-function useFitScale(base: number) {
-  const ref = useRef<HTMLDivElement | null>(null);
-  const [scale, setScale] = useState(0);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    const update = () => setScale(el.clientWidth / base);
-    update();
-    const ro = new ResizeObserver(update);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, [base]);
-  return { ref, scale };
-}
-
-/* Barra inferior en chico: momento a la izquierda + contador a la derecha. */
-function MiniBarra({
-  seg,
-  counterText,
-  counterColor,
-  progressValue,
-  progressClass,
-  paused,
-  grande,
-}: {
-  seg: Segment;
-  counterText: string;
-  counterColor: string;
-  progressValue: number;
-  progressClass: string;
-  paused: boolean;
-  /** true = como en el modo biblia: contador bien grande a la derecha */
-  grande?: boolean;
-}) {
-  return (
-    <div>
-      <div className="flex items-end justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-1 pb-1">
-          <div
-            className={cn(
-              "min-w-0 max-w-[46%] truncate rounded-full border-2 px-2 font-black uppercase leading-none tracking-wide",
-              COLORS[seg.color].chipDark,
-            )}
-            style={{ fontSize: 8, paddingTop: 3, paddingBottom: 3 }}
-          >
-            {seg.title}
-          </div>
-          {paused ? (
-            <div
-              className="shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
-              style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
-            >
-              Pausa
-            </div>
-          ) : null}
-        </div>
-        <div
-          className={cn(
-            "shrink-0 font-mono font-bold tabular-nums leading-none",
-            counterColor,
-          )}
-          style={{ fontSize: grande ? 32 : 22 }}
-        >
-          {counterText}
-        </div>
-      </div>
-      <Progress
-        value={progressValue}
-        className={cn("mt-1 h-[3px] bg-white/10", progressClass)}
-      />
-    </div>
-  );
-}
-
-/** Réplica en chico de la pantalla del predicador: muestra lo mismo que se
-    proyecta en ese momento — letra bíblica, tarjeta de avisos, guion,
-    contador grande y mensajes del operador. */
-function MiniPantalla({
-  state,
-  now,
-  biblia,
-}: {
-  state: ShowState;
-  now: number;
-  biblia: BibliaDisplay | null;
-}) {
-  const { ref, scale } = useFitScale(MINI_ANCHO);
-
-  const seg = currentSegment(state);
-  const active = state.currentIndex >= 0 && seg !== null;
-  const totalMs = (seg?.minutes ?? 0) * 60000;
-  const elapsed = active ? elapsedCurrent(state, now) : 0;
-  const remaining = active ? totalMs - elapsed : 0;
-  const overtimeMs = active ? Math.max(0, elapsed - totalMs) : 0;
-  const phase = active ? phaseOf(remaining, state.settings.warningMin) : "idle";
-  const live = now > 0 && active;
-  const cardsOn = active && cardsActive(seg);
-  const mode = seg?.layout ?? "timer";
-  const paused = state.status === "paused";
-
-  const counterText = live
-    ? phase === "overtime"
-      ? `+${fmtHMS(Math.floor(overtimeMs / 1000))}`
-      : fmtHMS(Math.ceil(remaining / 1000))
-    : "--:--";
-  const counterColor =
-    phase === "overtime"
-      ? "text-red-500"
-      : phase === "warning"
-        ? "text-amber-300"
-        : "text-white";
-  const progressValue = totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0;
-  const progressClass =
-    phase === "overtime"
-      ? "[&>div]:bg-red-500"
-      : phase === "warning"
-        ? "[&>div]:bg-amber-400"
-        : "[&>div]:bg-white/80";
-
-  const msg = state.message;
-
-  /* Contenido: lo mismo que muestra la pantalla del predicador, en chico */
-  let contenido: ReactNode = null;
-
-  if (msg) {
-    // Mensaje del operador: SOLO el texto (rojo o amarillo), como en grande
-    const len = msg.text.length;
-    contenido = (
-      <div className="absolute inset-0 flex items-center justify-center p-2.5">
-        <div
-          className={cn(
-            "flex h-full w-full items-center justify-center rounded-2xl px-2.5 text-center font-black leading-[1.1]",
-            msg.urgent ? "bg-red-600 text-white" : "bg-amber-400 text-zinc-950",
-          )}
-        >
-          <span style={{ fontSize: len <= 24 ? 36 : len <= 60 ? 26 : 19 }}>
-            {msg.text}
-          </span>
-        </div>
-      </div>
-    );
-  } else if (biblia) {
-    // Letra bíblica (con el tiempo abajo si el culto está en marcha)
-    contenido = (
-      <div className="absolute inset-0 flex flex-col">
-        <div className="flex min-h-0 flex-1 flex-col px-4 pb-1 pt-2.5">
-          <div className="flex items-end justify-between gap-1.5">
-            <div
-              className="min-w-0 truncate font-bold uppercase tracking-wider text-amber-300"
-              style={{ fontSize: 10 }}
-            >
-              {biblia.ref}
-              {biblia.version ? (
-                <span
-                  className="font-semibold tracking-normal text-amber-200/70"
-                  style={{ fontSize: 8 }}
-                >
-                  {" · "}
-                  {biblia.version}
-                </span>
-              ) : null}
-            </div>
-            {biblia.totalPartes > 1 ? (
-              <div
-                className="shrink-0 rounded-full border border-amber-300/40 bg-amber-300/10 px-1.5 font-bold text-amber-200"
-                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
-              >
-                Parte {biblia.parte} de {biblia.totalPartes}
-              </div>
-            ) : null}
-          </div>
-          <div
-            className="mt-1 min-h-0 flex-1 overflow-hidden font-semibold leading-[1.28] text-white [&_em]:text-amber-200 [&_strong]:text-amber-200"
-            style={{ fontSize: 13 }}
-            dangerouslySetInnerHTML={{ __html: biblia.html }}
-          />
-        </div>
-        {active && seg ? (
-          <div className="shrink-0 px-4 pb-2">
-            <MiniBarra
-              seg={seg}
-              counterText={counterText}
-              counterColor={counterColor}
-              progressValue={progressValue}
-              progressClass={progressClass}
-              paused={paused}
-              grande
-            />
-          </div>
-        ) : null}
-      </div>
-    );
-  } else if (state.status === "finished") {
-    contenido = (
-      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <div className="font-bold text-white" style={{ fontSize: 16 }}>
-          Culto finalizado
-        </div>
-        <div className="mt-1 text-zinc-500" style={{ fontSize: 8 }}>
-          Reiniciá desde el panel para un nuevo culto.
-        </div>
-      </div>
-    );
-  } else if (!active) {
-    const first = state.segments[0];
-    contenido = (
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-5 text-center">
-        <div className="font-bold leading-tight text-white" style={{ fontSize: 13 }}>
-          El culto comienza pronto
-        </div>
-        {first ? (
-          <div className="mt-1.5 text-zinc-400" style={{ fontSize: 8 }}>
-            Primer momento: <b>{first.title}</b> · {first.minutes} min
-          </div>
-        ) : null}
-      </div>
-    );
-  } else if (cardsOn && seg) {
-    // Tarjeta grande de avisos: todos los puntos juntos
-    const bullets = seg.bullets;
-    const fuente =
-      bullets.length <= 1 ? 30 : bullets.length <= 3 ? 21 : bullets.length <= 5 ? 15 : bullets.length <= 7 ? 11 : 9;
-    contenido = (
-      <div className="absolute inset-0 flex flex-col">
-        <div className="flex items-center gap-1.5 px-4 pt-3">
-          <span
-            className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COLORS[seg.color].dot)}
-          />
-          <div className="truncate font-bold text-zinc-200" style={{ fontSize: 9 }}>
-            {seg.title}
-          </div>
-          {paused ? (
-            <div
-              className="ml-auto shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
-              style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
-            >
-              En pausa
-            </div>
-          ) : null}
-        </div>
-        <div className="flex min-h-0 flex-1 items-center justify-center px-3">
-          <div className="text-center font-bold leading-[1.3] text-white">
-            {bullets.map((b, i) => (
-              <div key={i} style={{ fontSize: fuente }}>
-                {b}
-              </div>
-            ))}
-          </div>
-        </div>
-        <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-4 py-2">
-          <MiniBarra
-            seg={seg}
-            counterText={counterText}
-            counterColor={counterColor}
-            progressValue={progressValue}
-            progressClass={progressClass}
-            paused={paused}
-          />
-        </div>
-      </div>
-    );
-  } else if (mode === "script" && seg) {
-    // Guion + contador abajo (si no hay guion, los puntos numerados)
-    const lineas = seg.script.split("\n").filter((l) => l.trim());
-    const nLineas = Math.max(1, lineas.length || seg.bullets.length || 1);
-    const fuente = Math.min(22, Math.max(8, ((60 / nLineas - 3.2) / 1.35) * 1.8));
-    contenido = (
-      <div className="absolute inset-0 flex flex-col">
-        <div className="px-4 pt-3">
-          <div className="flex items-center gap-1.5">
-            <span
-              className={cn("h-1.5 w-1.5 shrink-0 rounded-full", COLORS[seg.color].dot)}
-            />
-            <div className="truncate font-bold text-zinc-200" style={{ fontSize: 9 }}>
-              {seg.title}
-            </div>
-            {paused ? (
-              <div
-                className="ml-auto shrink-0 rounded-full bg-amber-400 px-1.5 font-bold uppercase tracking-widest text-amber-950"
-                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
-              >
-                En pausa
-              </div>
-            ) : null}
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-hidden px-4 pt-2">
-          {lineas.length > 0 ? (
-            lineas.slice(0, 6).map((line, i) => (
-              <p
-                key={i}
-                className="mb-1.5 font-medium text-zinc-100"
-                style={{ fontSize: fuente, lineHeight: 1.35 }}
-              >
-                {line}
-              </p>
-            ))
-          ) : seg.bullets.length > 0 ? (
-            seg.bullets.slice(0, 6).map((b, i) => (
-              <p
-                key={i}
-                className="mb-1.5 font-bold text-zinc-100"
-                style={{ fontSize: Math.max(fuente, 10), lineHeight: 1.3 }}
-              >
-                {i + 1}. {b}
-              </p>
-            ))
-          ) : (
-            <p className="text-zinc-600" style={{ fontSize: 8 }}>
-              El guion de este momento está vacío.
-            </p>
-          )}
-        </div>
-        <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-4 py-2">
-          <MiniBarra
-            seg={seg}
-            counterText={counterText}
-            counterColor={counterColor}
-            progressValue={progressValue}
-            progressClass={progressClass}
-            paused={paused}
-          />
-        </div>
-      </div>
-    );
-  } else if (seg) {
-    // Contador grande
-    contenido = (
-      <div className="absolute inset-0 flex flex-col items-center justify-center px-3 pb-3 text-center">
-        <div className="font-bold tracking-wide text-zinc-200" style={{ fontSize: 10 }}>
-          {seg.title}
-        </div>
-        {paused ? (
-          <div
-            className="mt-1 rounded-full bg-amber-400 px-2 font-bold uppercase tracking-widest text-amber-950"
-            style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
-          >
-            En pausa
-          </div>
-        ) : null}
-        <div
-          className={cn(
-            "mt-1 font-mono font-bold tabular-nums leading-none",
-            counterColor,
-          )}
-          style={{ fontSize: 52 }}
-        >
-          {counterText}
-        </div>
-        <div className="mt-2 w-3/4">
-          <Progress
-            value={progressValue}
-            className={cn("h-[3px] bg-white/10", progressClass)}
-          />
-        </div>
-        {state.settings.showBulletsOnTimer && seg.bullets.length > 0 ? (
-          <div className="absolute bottom-2 left-3 right-3 flex flex-wrap items-center justify-center gap-1">
-            {seg.bullets.slice(0, 3).map((b, i) => (
-              <span
-                key={i}
-                className={cn(
-                  "max-w-[45%] truncate rounded-full border px-1.5",
-                  COLORS[seg.color].chipDark,
-                )}
-                style={{ fontSize: 7, paddingTop: 2, paddingBottom: 2 }}
-              >
-                {b}
-              </span>
-            ))}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-
-  return (
-    <div
-      ref={ref}
-      className="relative w-full select-none overflow-hidden rounded-xl border-2 border-white/15 bg-black"
-      style={{ aspectRatio: "16 / 9" }}
-    >
-      <div
-        className="absolute left-0 top-0 origin-top-left"
-        style={{
-          width: MINI_ANCHO,
-          height: MINI_ALTO,
-          transform: scale > 0 ? `scale(${scale})` : undefined,
-          opacity: scale > 0 ? 1 : 0,
-        }}
-      >
-        {contenido}
-      </div>
-    </div>
   );
 }
