@@ -802,6 +802,29 @@ export default function PanelView() {
     }
   }, [programas]);
 
+  /* El programa que está EN USO ahora (v0.9.0): recordarlo permite el botón
+     "Guardar cambios", que actualiza ese mismo programa sin reescribir su
+     nombre. Queda guardado para sobrevivir a una recarga de la página. */
+  const [progEnCurso, setProgEnCurso] = useState<string | null>(null);
+  const [progGuardadoOk, setProgGuardadoOk] = useState(false);
+  const [confirmarBaja, setConfirmarBaja] = useState<string | null>(null);
+  useEffect(() => {
+    try {
+      const v = localStorage.getItem("culto-programa-activo-v1");
+      if (typeof v === "string" && v) setProgEnCurso(v);
+    } catch {
+      /* sin almacenamiento: no hay programa en curso recordado */
+    }
+  }, []);
+  useEffect(() => {
+    try {
+      if (progEnCurso) localStorage.setItem("culto-programa-activo-v1", progEnCurso);
+      else localStorage.removeItem("culto-programa-activo-v1");
+    } catch {
+      /* sin almacenamiento: solo vale para esta sesión */
+    }
+  }, [progEnCurso]);
+
   /* ── Nube: los programas también se guardan en un servidor, con un
         código de sincronización. Así la lista no queda atrapada en una
         computadora: en otra máquina se pega el mismo código y aparecen
@@ -1052,10 +1075,30 @@ export default function PanelView() {
   const doReset = () => {
     if (stateRef.current.currentIndex >= 0) mutate((p) => resetCurrent(p, Date.now()));
   };
+  /* Reinicio en dos pasos, dentro de la app (sin window.confirm, que algunos
+     navegadores bloquean en silencio): primer clic arma, segundo confirma. */
+  const [confirmarReinicio, setConfirmarReinicio] = useState(false);
   const doRestartService = () => {
-    if (window.confirm("¿Reiniciar todo el culto? Se pierden los tiempos del momento actual.")) {
-      mutate((p) => resetService(p));
+    if (!confirmarReinicio) {
+      setConfirmarReinicio(true);
+      window.setTimeout(() => setConfirmarReinicio(false), 4000);
+      return;
     }
+    setConfirmarReinicio(false);
+    mutate((p) => resetService(p));
+  };
+
+  /* Plantilla sabática en dos pasos, igual que el reinicio */
+  const [confirmarPlantilla, setConfirmarPlantilla] = useState(false);
+  const cargarPlantilla = () => {
+    if (!confirmarPlantilla) {
+      setConfirmarPlantilla(true);
+      window.setTimeout(() => setConfirmarPlantilla(false), 4000);
+      return;
+    }
+    setConfirmarPlantilla(false);
+    mutate((p) => ({ ...p, segments: defaultSegments() }));
+    setProgEnCurso(null);
   };
 
   const adjustMinutes = (delta: number) => {
@@ -1159,12 +1202,60 @@ export default function PanelView() {
         segments: state.segments.map((x) => ({ ...x, bullets: [...x.bullets] })),
         creado: Date.now(),
       },
-      ...programas.filter((y) => y.nombre.toLowerCase() !== nombre.toLowerCase()),
+      ...programas.filter((y) => claveProg(y.nombre) !== claveProg(nombre)),
     ];
     setProgramas(lista);
     setProgNombre("");
+    setProgEnCurso(nombre);
     /* El guardado viaja al servidor: si todavía no hay código, se genera uno */
     void pushANube(asegurarCodigoNube(), lista);
+  };
+
+  /* Huella de los momentos (sin los id, que se regeneran en cada carga):
+     sirve para saber si lo que hay en pantalla difiere del programa guardado */
+  const huellaSegs = (segs: Segment[]) =>
+    JSON.stringify(segs.map((x) => ({ ...x, id: 0 })));
+
+  /* Info del programa en uso: existe y ¿difiere de lo que hay en pantalla? */
+  const progEnCursoInfo = useMemo(() => {
+    if (!progEnCurso) return null;
+    const guardado = programas.find(
+      (y) => claveProg(y.nombre) === claveProg(progEnCurso),
+    );
+    if (!guardado) return null;
+    const iguales =
+      huellaSegs(state.segments) === huellaSegs(guardado.segments) &&
+      franja.inicio === guardado.inicio &&
+      franja.limite === guardado.limite;
+    return { guardado, iguales };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [progEnCurso, programas, state.segments, franja.inicio, franja.limite]);
+  const hayCambiosProg = progEnCursoInfo ? !progEnCursoInfo.iguales : false;
+
+  /* BOTÓN GUARDAR CAMBIOS (v0.9.0): actualiza el programa en uso con lo que
+     hay ahora en pantalla (momentos, puntos y franja horaria), sin pedir
+     nombre ni confirmación del navegador. Si entre tanto el programa fue
+     borrado, lo vuelve a crear con el mismo nombre. */
+  const guardarCambiosPrograma = () => {
+    if (!progEnCurso) return;
+    const clave = claveProg(progEnCurso);
+    const previo = programas.find((y) => claveProg(y.nombre) === clave);
+    const nuevo: ProgramaGuardado = {
+      id: previo?.id ?? uid(),
+      nombre: progEnCurso,
+      inicio: franja.inicio,
+      limite: franja.limite,
+      segments: state.segments.map((x) => ({ ...x, bullets: [...x.bullets] })),
+      creado: Date.now(),
+    };
+    const lista = previo
+      ? programas.map((y) => (claveProg(y.nombre) === clave ? nuevo : y))
+      : [nuevo, ...programas];
+    setProgramas(lista);
+    setProgGuardadoOk(true);
+    window.setTimeout(() => setProgGuardadoOk(false), 2500);
+    if (nubeCodigoRef.current) void pushANube(nubeCodigoRef.current, lista);
+    else void pushANube(asegurarCodigoNube(), lista);
   };
 
   const cargarPrograma = (pr: ProgramaGuardado) => {
@@ -1183,19 +1274,33 @@ export default function PanelView() {
       inicio: iniOk ? String(pr.inicio) : franja.inicio,
       limite: limOk ? String(pr.limite) : franja.limite,
     });
+    /* Queda "en uso": habilita el botón Guardar cambios para ESTE programa */
+    setProgEnCurso(pr.nombre);
+    setProgGuardadoOk(false);
     setProgOpen(false);
   };
 
   const borrarPrograma = (id: string) => {
-    if (window.confirm("¿Eliminar este programa guardado?")) {
-      const pr = programas.find((y) => y.id === id);
-      const lista = programas.filter((y) => y.id !== id);
-      /* La baja queda anotada: si el servidor todavía tiene una copia vieja
-         de este programa, no vuelve a aparecer al recargar la página */
-      if (pr) anotarBaja(pr.nombre);
-      setProgramas(lista);
-      if (nubeCodigoRef.current) void pushANube(nubeCodigoRef.current, lista);
+    const pr = programas.find((y) => y.id === id);
+    const lista = programas.filter((y) => y.id !== id);
+    /* La baja queda anotada: si el servidor todavía tiene una copia vieja
+       de este programa, no vuelve a aparecer al recargar la página */
+    if (pr) anotarBaja(pr.nombre);
+    setProgramas(lista);
+    if (pr && progEnCurso && claveProg(pr.nombre) === claveProg(progEnCurso)) {
+      setProgEnCurso(null);
     }
+    setConfirmarBaja(null);
+    if (nubeCodigoRef.current) void pushANube(nubeCodigoRef.current, lista);
+  };
+
+  /* Baja en dos pasos, DENTRO de la app: el primer clic arma el botón
+     ("¿Eliminar?") y el segundo confirma. No se usa window.confirm porque
+     algunos navegadores, si alguna vez se marcó "impedir más cuadros de
+     diálogo", lo rechazan en silencio y el botón queda mudo para siempre. */
+  const pedirBajaPrograma = (id: string) => {
+    setConfirmarBaja(id);
+    window.setTimeout(() => setConfirmarBaja((v) => (v === id ? null : v)), 4000);
   };
 
   /* ────────────── Pantalla del predicador ────────────── */
@@ -1744,6 +1849,32 @@ export default function PanelView() {
                 al momento · doble clic lo edita
               </p>
               <div className="ml-auto flex shrink-0 items-center gap-1">
+                {/* BOTÓN GUARDAR CAMBIOS (v0.9.0): aparece cuando el culto en
+                    uso difiere de lo guardado; un clic y queda guardado */}
+                {progEnCursoInfo && hayCambiosProg ? (
+                  <Button
+                    size="sm"
+                    className="cns-btn-gold h-7 shrink-0 text-xs"
+                    title={`Guardar los cambios en el programa “${progEnCurso}” (momentos, puntos y horas)`}
+                    aria-label="Guardar cambios en el programa en uso"
+                    onClick={guardarCambiosPrograma}
+                  >
+                    <Save className="h-3.5 w-3.5" aria-hidden="true" /> Guardar cambios
+                  </Button>
+                ) : progEnCursoInfo ? (
+                  <span
+                    className={cn(
+                      "cns-pill h-7 shrink-0",
+                      progGuardadoOk ? "cns-pill-ok" : "cns-pill-dim",
+                    )}
+                    title={`Estás usando el programa “${progEnCurso}”`}
+                  >
+                    {progGuardadoOk ? (
+                      <Check className="h-3 w-3" aria-hidden="true" />
+                    ) : null}
+                    «{progEnCurso}»
+                  </span>
+                ) : null}
                 <Button
                   size="sm"
                   variant="ghost"
@@ -1757,20 +1888,18 @@ export default function PanelView() {
                 <Button
                   size="sm"
                   variant="ghost"
-                  className="cns-btn-ghost h-7 shrink-0 text-xs"
+                  className={cn(
+                    "h-7 shrink-0 text-xs",
+                    confirmarPlantilla
+                      ? "border border-[#B0452F] text-[#B0452F] hover:bg-[#F9EDE8] hover:text-[#B0452F]"
+                      : "cns-btn-ghost",
+                  )}
                   title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
                   aria-label="Cargar plantilla sabática"
-                  onClick={() => {
-                    if (
-                      window.confirm(
-                        "¿Cargar de nuevo el programa sabático de ejemplo? Se reemplazan los momentos actuales.",
-                      )
-                    ) {
-                      mutate((p) => ({ ...p, segments: defaultSegments() }));
-                    }
-                  }}
+                  onClick={cargarPlantilla}
                 >
-                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" /> Plantilla
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                  {confirmarPlantilla ? "¿Confirmar?" : "Plantilla"}
                 </Button>
               </div>
             </div>
@@ -2037,12 +2166,17 @@ export default function PanelView() {
                       </p>
                     </div>
                     <Button
-                      className="cns-btn-line h-10 shrink-0"
-                      variant="outline"
+                      className="h-10 shrink-0"
+                      variant={confirmarReinicio ? "destructive" : "outline"}
                       onClick={doRestartService}
+                      title={
+                        confirmarReinicio
+                          ? "Tocá de nuevo para confirmar el reinicio"
+                          : "Reinicia el culto: se pierden los tiempos del momento actual"
+                      }
                     >
-                      <RotateCcw className="h-4 w-4" aria-hidden="true" /> Reiniciar
-                      todo
+                      <RotateCcw className="h-4 w-4" aria-hidden="true" />{" "}
+                      {confirmarReinicio ? "¿Confirmar reinicio?" : "Reiniciar todo"}
                     </Button>
                   </div>
                 ) : !active ? (
@@ -2402,13 +2536,54 @@ export default function PanelView() {
             <DialogTitle>Programas guardados</DialogTitle>
             <DialogDescription>
               Guardá los tiempos de cada tipo de culto (mañana, evangelismo, jóvenes,
-              oración…) y cargalos cuando quieras: después los ajustás en vivo. Los
-              programas también viajan a un <b>servidor</b> como respaldo: con el
-              código, la misma lista aparece en cualquier computadora. Lo guardado
-              en esta computadora <b>siempre manda</b>.
+              oración…) y cargalos cuando quieras: después los ajustás en vivo. El
+              botón dorado <b>Guardar cambios</b> actualiza el culto que estás
+              usando; <b>Cargar</b> cambia de culto al toque, sin preguntar nada.
+              Todo también viaja a un <b>servidor</b> como respaldo: con el código,
+              la misma lista aparece en cualquier computadora.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
+            {/* El programa en uso, con su botón GUARDAR CAMBIOS bien visible
+                (v0.9.0): un clic actualiza ese culto sin reescribir el nombre */}
+            {progEnCursoInfo ? (
+              <div
+                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2.5"
+                style={{
+                  borderColor: hayCambiosProg
+                    ? "rgba(176,141,87,.55)"
+                    : "rgba(180,160,120,.35)",
+                }}
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-bold text-[#241E16]">
+                    Estás usando «{progEnCurso}»
+                  </div>
+                  <div className="text-[11px] text-muted-foreground">
+                    {hayCambiosProg
+                      ? "Tenés cambios sin guardar en este programa."
+                      : progGuardadoOk
+                        ? "¡Cambios guardados!"
+                        : "Al día: coincide con lo guardado."}
+                  </div>
+                </div>
+                {hayCambiosProg ? (
+                  <Button
+                    size="sm"
+                    className="cns-btn-gold h-8 shrink-0 text-xs"
+                    onClick={guardarCambiosPrograma}
+                    title="Guarda los momentos, los puntos y las horas actuales en este programa"
+                  >
+                    <Save className="h-3.5 w-3.5" aria-hidden="true" /> Guardar cambios
+                  </Button>
+                ) : (
+                  <span className="cns-pill cns-pill-ok">
+                    <span className="cns-led cns-led-ok" />{" "}
+                    {progGuardadoOk ? "Guardado" : "Al día"}
+                  </span>
+                )}
+              </div>
+            ) : null}
             <div className="flex items-end gap-2">
               <div className="min-w-0 flex-1 space-y-1">
                 <Label htmlFor="prog-nombre" className="text-xs">
@@ -2418,16 +2593,33 @@ export default function PanelView() {
                   id="prog-nombre"
                   className="cns-in"
                   value={progNombre}
-                  placeholder="Ej.: Culto joven"
+                  placeholder={
+                    progEnCurso
+                      ? `Vacío = guardar cambios en «${progEnCurso}»; o poné otro nombre`
+                      : "Ej.: Culto joven"
+                  }
                   onChange={(e) => setProgNombre(e.target.value)}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") guardarPrograma();
+                    if (e.key === "Enter") {
+                      if (progNombre.trim()) guardarPrograma();
+                      else if (progEnCurso) guardarCambiosPrograma();
+                    }
                   }}
                 />
               </div>
               <Button
                 className="cns-btn-gold h-9 shrink-0"
-                onClick={guardarPrograma}
+                onClick={() => {
+                  if (progNombre.trim()) guardarPrograma();
+                  else if (progEnCurso) guardarCambiosPrograma();
+                }}
+                title={
+                  progNombre.trim()
+                    ? "Guardar como un programa con este nombre (reemplaza si ya existe)"
+                    : progEnCurso
+                      ? `Guardar los cambios en “${progEnCurso}”`
+                      : "Escribí un nombre para guardar"
+                }
               >
                 <Save className="h-4 w-4" aria-hidden="true" /> Guardar
               </Button>
@@ -2435,7 +2627,9 @@ export default function PanelView() {
             <p className="text-[11px] leading-snug text-muted-foreground">
               Se guarda con la franja horaria actual (Inicio {franja.inicio} · Límite{" "}
               {franja.limite}) y los {state.segments.length} momentos de la lista, con
-              sus puntos. Si guardás con un nombre que ya existe, lo reemplaza.
+              sus puntos. Si guardás con un nombre que ya existe, lo reemplaza. Si
+              dejás el campo vacío y estás usando un programa, el botón guarda los
+              cambios en ese mismo programa.
             </p>
             {/* Guardado en el servidor: código de sincronización entre computadoras */}
             <div
@@ -2526,34 +2720,43 @@ export default function PanelView() {
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
+                        {/* Carga DIRECTA (v0.9.0): sin cuadro de confirmación del
+                            navegador, que podía estar bloqueado y dejar el botón
+                            mudo — era la razón por la que no se podía alternar */}
                         <Button
                           size="sm"
                           variant="outline"
                           className="cns-btn-line h-8 text-xs"
-                          onClick={() => {
-                            const enCurso = state.status !== "idle";
-                            if (
-                              window.confirm(
-                                `¿Cargar el programa “${pr.nombre}”? Se reemplazan los momentos actuales${
-                                  enCurso ? " y el contador se reinicia" : ""
-                                }.`,
-                              )
-                            ) {
-                              cargarPrograma(pr);
-                            }
-                          }}
+                          title={`Cargar “${pr.nombre}”: reemplaza los momentos actuales`}
+                          onClick={() => cargarPrograma(pr)}
                         >
                           Cargar
                         </Button>
+                        {/* Baja en dos pasos dentro de la app */}
                         <Button
-                          size="icon"
-                          variant="ghost"
-                          className="cns-icobtn h-8 w-8 shrink-0"
+                          size="sm"
+                          variant={confirmarBaja === pr.id ? "destructive" : "ghost"}
+                          className={cn(
+                            "h-8 shrink-0 text-xs",
+                            confirmarBaja === pr.id ? "px-2.5" : "cns-icobtn w-8 px-0",
+                          )}
                           aria-label={`Eliminar el programa ${pr.nombre}`}
-                          title="Eliminar este programa"
-                          onClick={() => borrarPrograma(pr.id)}
+                          title={
+                            confirmarBaja === pr.id
+                              ? "Tocá de nuevo para confirmar la eliminación"
+                              : "Eliminar este programa (pide confirmar con un segundo clic)"
+                          }
+                          onClick={() =>
+                            confirmarBaja === pr.id
+                              ? borrarPrograma(pr.id)
+                              : pedirBajaPrograma(pr.id)
+                          }
                         >
-                          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          {confirmarBaja === pr.id ? (
+                            "¿Eliminar?"
+                          ) : (
+                            <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          )}
                         </Button>
                       </div>
                     </li>
@@ -2844,6 +3047,14 @@ function HelpDialog() {
             (mañana, evangelismo, jóvenes, oración): configurá los momentos y las
             horas, guardalo con un nombre y cargalo cuando lo necesites. Siempre
             queda editable: cambiás minutos y horas igual que antes.
+          </li>
+          <li>
+            · ¿Ajustaste un culto que ya guardaste? Con el culto cargado aparece el
+            botón dorado <b>Guardar cambios</b>, a la derecha del título{" "}
+            <b>Orden del culto</b> y también arriba del cuadro de <b>Programas</b>:
+            un clic y el programa queda actualizado, sin volver a escribir el
+            nombre. <b>Cargar</b> cambia de un culto a otro al toque, sin
+            preguntar nada.
           </li>
           <li>
             · El botón <b>Programa</b> (arriba, a la derecha) abre la{" "}
