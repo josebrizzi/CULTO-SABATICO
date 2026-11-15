@@ -24,6 +24,7 @@ import {
   SkipBack,
   SkipForward,
   Trash2,
+  Undo2,
   X,
 } from "lucide-react";
 
@@ -658,6 +659,21 @@ function minDeHora(hhmm: string): number | null {
   return h * 60 + min;
 }
 
+/** "hoy", "ayer" o la fecha corta: para mostrar cuándo se guardó cada
+    programa en la lista de Programas. */
+function fechaGuardado(ts: number): string {
+  const d = new Date(ts);
+  const hoy = new Date();
+  const dias = Math.floor(
+    (new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()).getTime() -
+      new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()) /
+      86400000,
+  );
+  if (dias <= 0) return "hoy";
+  if (dias === 1) return "ayer";
+  return d.toLocaleDateString("es-AR", { day: "numeric", month: "short" });
+}
+
 /** 570 → "09:30" (da la vuelta a las 24 h si el culto cruza medianoche). */
 function fmtHora(min: number): string {
   const m = ((Math.round(min) % 1440) + 1440) % 1440;
@@ -675,6 +691,18 @@ function fechaLargaHoy(): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+/** Versión anterior de un programa: queda guardada DENTRO del programa nuevo
+    cuando un guardado lo pisa (v0.9.1), como respaldo recuperable en
+    cualquier momento con el botón "Anterior" de la lista. */
+type ProgramaReemplazo = {
+  id: string;
+  nombre: string;
+  inicio: string;
+  limite: string;
+  segments: Segment[];
+  creado: number;
+};
+
 /** Un programa guardado: los momentos de un tipo de culto con su franja horaria. */
 type ProgramaGuardado = {
   id: string;
@@ -683,6 +711,8 @@ type ProgramaGuardado = {
   limite: string;
   segments: Segment[];
   creado: number;
+  /** La versión que este programa reemplazó en el último guardado (v0.9.1). */
+  reemplazado?: ProgramaReemplazo;
 };
 
 /* ──────────── Fusión de listas de programas (local + nube) ────────────
@@ -803,11 +833,25 @@ export default function PanelView() {
   }, [programas]);
 
   /* El programa que está EN USO ahora (v0.9.0): recordarlo permite el botón
-     "Guardar cambios", que actualiza ese mismo programa sin reescribir su
-     nombre. Queda guardado para sobrevivir a una recarga de la página. */
+     "Guardar en «…»", que actualiza ese mismo programa sin reescribir su
+     nombre (y deja la versión anterior como respaldo, v0.9.1). Queda
+     guardado para sobrevivir a una recarga de la página. */
   const [progEnCurso, setProgEnCurso] = useState<string | null>(null);
   const [progGuardadoOk, setProgGuardadoOk] = useState(false);
   const [confirmarBaja, setConfirmarBaja] = useState<string | null>(null);
+  /* Reemplazo en dos pasos (v0.9.1): guardar con un nombre que ya existe
+     primero arma el botón ("¿Reemplazar?") y el segundo confirma. Reemplazar
+     un programa en silencio era la forma en que un culto podía quedar
+     guardado adentro de otro sin darse cuenta. */
+  const [confirmarReemplazo, setConfirmarReemplazo] = useState<string | null>(
+    null,
+  );
+  /* Aviso con Deshacer (v0.9.1): cuando un guardado pisa una versión
+     anterior, esta queda como respaldo y el aviso ofrece restaurarla. */
+  const [avisoReemplazo, setAvisoReemplazo] = useState<{
+    id: string;
+    nombre: string;
+  } | null>(null);
   useEffect(() => {
     try {
       const v = localStorage.getItem("culto-programa-activo-v1");
@@ -1193,20 +1237,56 @@ export default function PanelView() {
   const guardarPrograma = () => {
     const nombre = progNombre.trim();
     if (!nombre) return;
+    const previo = programas.find(
+      (y) => claveProg(y.nombre) === claveProg(nombre),
+    );
+    /* v0.9.1: si el nombre ya existe, el primer clic arma el botón y el
+       segundo confirma el reemplazo — nunca se pisa un programa guardado
+       sin avisar. */
+    if (previo && confirmarReemplazo !== previo.id) {
+      setConfirmarReemplazo(previo.id);
+      window.setTimeout(
+        () => setConfirmarReemplazo((v) => (v === previo.id ? null : v)),
+        6000,
+      );
+      return;
+    }
+    const previoRespaldo: ProgramaReemplazo | null = previo
+      ? {
+          id: previo.id,
+          nombre: previo.nombre,
+          inicio: previo.inicio,
+          limite: previo.limite,
+          segments: previo.segments.map((x) => ({
+            ...x,
+            bullets: [...x.bullets],
+          })),
+          creado: previo.creado,
+        }
+      : null;
     const lista: ProgramaGuardado[] = [
       {
-        id: uid(),
+        id: previo?.id ?? uid(),
         nombre,
         inicio: franja.inicio,
         limite: franja.limite,
         segments: state.segments.map((x) => ({ ...x, bullets: [...x.bullets] })),
         creado: Date.now(),
+        ...(previoRespaldo ? { reemplazado: previoRespaldo } : {}),
       },
       ...programas.filter((y) => claveProg(y.nombre) !== claveProg(nombre)),
     ];
     setProgramas(lista);
     setProgNombre("");
+    setConfirmarReemplazo(null);
     setProgEnCurso(nombre);
+    if (previoRespaldo) {
+      setAvisoReemplazo({ id: previoRespaldo.id, nombre });
+      window.setTimeout(
+        () => setAvisoReemplazo((v) => (v?.id === previoRespaldo.id ? null : v)),
+        12000,
+      );
+    }
     /* El guardado viaja al servidor: si todavía no hay código, se genera uno */
     void pushANube(asegurarCodigoNube(), lista);
   };
@@ -1232,6 +1312,16 @@ export default function PanelView() {
   }, [progEnCurso, programas, state.segments, franja.inicio, franja.limite]);
   const hayCambiosProg = progEnCursoInfo ? !progEnCursoInfo.iguales : false;
 
+  /* ¿El nombre tipeado en el cuadro de Programas ya existe? Si sí, el botón
+     Guardar pasa a pedir confirmación antes de reemplazar (v0.9.1). */
+  const previoNombreTipeado = progNombre.trim()
+    ? programas.find(
+        (y) => claveProg(y.nombre) === claveProg(progNombre.trim()),
+      )
+    : undefined;
+  const reemplazoArmado =
+    !!previoNombreTipeado && confirmarReemplazo === previoNombreTipeado.id;
+
   /* BOTÓN GUARDAR CAMBIOS (v0.9.0): actualiza el programa en uso con lo que
      hay ahora en pantalla (momentos, puntos y franja horaria), sin pedir
      nombre ni confirmación del navegador. Si entre tanto el programa fue
@@ -1247,15 +1337,68 @@ export default function PanelView() {
       limite: franja.limite,
       segments: state.segments.map((x) => ({ ...x, bullets: [...x.bullets] })),
       creado: Date.now(),
+      /* v0.9.1: lo que había guardado queda como respaldo dentro del
+         programa — recuperable con "Anterior" o con el aviso Deshacer */
+      ...(previo
+        ? {
+            reemplazado: {
+              id: previo.id,
+              nombre: previo.nombre,
+              inicio: previo.inicio,
+              limite: previo.limite,
+              segments: previo.segments.map((x) => ({
+                ...x,
+                bullets: [...x.bullets],
+              })),
+              creado: previo.creado,
+            },
+          }
+        : {}),
     };
     const lista = previo
       ? programas.map((y) => (claveProg(y.nombre) === clave ? nuevo : y))
       : [nuevo, ...programas];
     setProgramas(lista);
     setProgGuardadoOk(true);
+    if (previo) {
+      setAvisoReemplazo({ id: previo.id, nombre: progEnCurso });
+      window.setTimeout(
+        () => setAvisoReemplazo((v) => (v?.id === previo.id ? null : v)),
+        12000,
+      );
+    }
     window.setTimeout(() => setProgGuardadoOk(false), 2500);
     if (nubeCodigoRef.current) void pushANube(nubeCodigoRef.current, lista);
     else void pushANube(asegurarCodigoNube(), lista);
+  };
+
+  /* Restaurar la versión anterior (v0.9.1): el programa vuelve a ser lo que
+     era antes del último guardado, y lo que estaba guardado pasa a ser el
+     respaldo a su vez — el intercambio es reversible, nada se pierde. */
+  const restaurarAnterior = (id: string) => {
+    const pr = programas.find((y) => y.id === id);
+    if (!pr?.reemplazado) return;
+    const actual: ProgramaReemplazo = {
+      id: pr.id,
+      nombre: pr.nombre,
+      inicio: pr.inicio,
+      limite: pr.limite,
+      segments: pr.segments.map((x) => ({ ...x, bullets: [...x.bullets] })),
+      creado: pr.creado,
+    };
+    const restaurado: ProgramaGuardado = {
+      ...pr.reemplazado,
+      segments: pr.reemplazado.segments.map((x) => ({
+        ...x,
+        bullets: [...x.bullets],
+      })),
+      reemplazado: actual,
+    };
+    const lista = programas.map((y) => (y.id === id ? restaurado : y));
+    setProgramas(lista);
+    setConfirmarReemplazo((v) => (v === id ? null : v));
+    setAvisoReemplazo((v) => (v?.id === id ? null : v));
+    if (nubeCodigoRef.current) void pushANube(nubeCodigoRef.current, lista);
   };
 
   const cargarPrograma = (pr: ProgramaGuardado) => {
@@ -1848,18 +1991,21 @@ export default function PanelView() {
                 {state.segments.length} momentos · {fmtMin(totalMin)} · un clic salta
                 al momento · doble clic lo edita
               </p>
-              <div className="ml-auto flex shrink-0 items-center gap-1">
+              <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1">
                 {/* BOTÓN GUARDAR CAMBIOS (v0.9.0): aparece cuando el culto en
-                    uso difiere de lo guardado; un clic y queda guardado */}
+                    uso difiere de lo guardado; un clic y queda guardado.
+                    v0.9.1: el rótulo nombra el programa de destino, para que
+                    nunca quede dudas de DÓNDE se está guardando. */}
                 {progEnCursoInfo && hayCambiosProg ? (
                   <Button
                     size="sm"
                     className="cns-btn-gold h-7 shrink-0 text-xs"
-                    title={`Guardar los cambios en el programa “${progEnCurso}” (momentos, puntos y horas)`}
-                    aria-label="Guardar cambios en el programa en uso"
+                    title={`Guarda los momentos, los puntos y las horas actuales en el programa “${progEnCurso}” — la versión anterior queda como respaldo`}
+                    aria-label={`Guardar en el programa ${progEnCurso}`}
                     onClick={guardarCambiosPrograma}
                   >
-                    <Save className="h-3.5 w-3.5" aria-hidden="true" /> Guardar cambios
+                    <Save className="h-3.5 w-3.5" aria-hidden="true" /> Guardar en «
+                    {progEnCurso}»
                   </Button>
                 ) : progEnCursoInfo ? (
                   <span
@@ -2537,8 +2683,9 @@ export default function PanelView() {
             <DialogDescription>
               Guardá los tiempos de cada tipo de culto (mañana, evangelismo, jóvenes,
               oración…) y cargalos cuando quieras: después los ajustás en vivo. El
-              botón dorado <b>Guardar cambios</b> actualiza el culto que estás
-              usando; <b>Cargar</b> cambia de culto al toque, sin preguntar nada.
+              botón dorado <b>Guardar en «…»</b> actualiza el culto que estás
+              usando y deja la versión anterior como respaldo; <b>Cargar</b>{" "}
+              cambia de culto al toque, sin preguntar nada.
               Todo también viaja a un <b>servidor</b> como respaldo: con el código,
               la misma lista aparece en cualquier computadora.
             </DialogDescription>
@@ -2572,9 +2719,10 @@ export default function PanelView() {
                     size="sm"
                     className="cns-btn-gold h-8 shrink-0 text-xs"
                     onClick={guardarCambiosPrograma}
-                    title="Guarda los momentos, los puntos y las horas actuales en este programa"
+                    title={`Guarda los momentos, los puntos y las horas actuales en “${progEnCurso}” — la versión anterior queda como respaldo`}
                   >
-                    <Save className="h-3.5 w-3.5" aria-hidden="true" /> Guardar cambios
+                    <Save className="h-3.5 w-3.5" aria-hidden="true" /> Guardar en «
+                    {progEnCurso}»
                   </Button>
                 ) : (
                   <span className="cns-pill cns-pill-ok">
@@ -2598,7 +2746,10 @@ export default function PanelView() {
                       ? `Vacío = guardar cambios en «${progEnCurso}»; o poné otro nombre`
                       : "Ej.: Culto joven"
                   }
-                  onChange={(e) => setProgNombre(e.target.value)}
+                  onChange={(e) => {
+                    setProgNombre(e.target.value);
+                    setConfirmarReemplazo(null);
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter") {
                       if (progNombre.trim()) guardarPrograma();
@@ -2608,26 +2759,37 @@ export default function PanelView() {
                 />
               </div>
               <Button
-                className="cns-btn-gold h-9 shrink-0"
+                variant={reemplazoArmado ? "destructive" : "default"}
+                className={
+                  reemplazoArmado ? "h-9 shrink-0" : "cns-btn-gold h-9 shrink-0"
+                }
                 onClick={() => {
                   if (progNombre.trim()) guardarPrograma();
                   else if (progEnCurso) guardarCambiosPrograma();
                 }}
                 title={
-                  progNombre.trim()
-                    ? "Guardar como un programa con este nombre (reemplaza si ya existe)"
-                    : progEnCurso
-                      ? `Guardar los cambios en “${progEnCurso}”`
-                      : "Escribí un nombre para guardar"
+                  reemplazoArmado && previoNombreTipeado
+                    ? `Reemplaza los ${previoNombreTipeado.segments.length} momentos guardados en “${previoNombreTipeado.nombre}”; la versión anterior queda como respaldo`
+                    : progNombre.trim()
+                      ? "Guardar como un programa con este nombre (si ya existe, pide confirmar)"
+                      : progEnCurso
+                        ? `Guardar los cambios en “${progEnCurso}”`
+                        : "Escribí un nombre para guardar"
                 }
               >
-                <Save className="h-4 w-4" aria-hidden="true" /> Guardar
+                <Save className="h-4 w-4" aria-hidden="true" />{" "}
+                {reemplazoArmado && previoNombreTipeado
+                  ? `¿Reemplazar “${previoNombreTipeado.nombre}”?`
+                  : "Guardar"}
               </Button>
             </div>
             <p className="text-[11px] leading-snug text-muted-foreground">
               Se guarda con la franja horaria actual (Inicio {franja.inicio} · Límite{" "}
               {franja.limite}) y los {state.segments.length} momentos de la lista, con
-              sus puntos. Si guardás con un nombre que ya existe, lo reemplaza. Si
+              sus puntos. Si guardás con un nombre que ya existe, el botón pide{" "}
+              <b>confirmar con un segundo clic</b> y la versión anterior{" "}
+              <b>queda guardada</b>: se recupera cuando quieras con el botón{" "}
+              <b>Anterior</b> de la lista. Si
               dejás el campo vacío y estás usando un programa, el botón guarda los
               cambios en ese mismo programa.
             </p>
@@ -2703,7 +2865,6 @@ export default function PanelView() {
               <ul className="space-y-2">
                 {programas.map((pr) => {
                   const total = pr.segments.reduce((a, x) => a + x.minutes, 0);
-                  const ini = minDeHora(pr.inicio) ?? 570;
                   return (
                     <li
                       key={pr.id}
@@ -2714,12 +2875,31 @@ export default function PanelView() {
                         <div className="text-sm font-bold text-[#241E16]">
                           {pr.nombre}
                         </div>
+                        {/* v0.9.1: la franja y la fecha guardadas se ven ANTES
+                            de cargar, así un programa que tiene otro culto
+                            adentro se nota de una (ej. "franja 09:30 → 12:00") */}
                         <div className="text-[11px] text-muted-foreground">
-                          {pr.segments.length} momentos · {fmtMin(total)} ·{" "}
-                          {fmtHora(ini)} → {fmtHora(ini + total)}
+                          {pr.segments.length} momentos · {fmtMin(total)} · franja{" "}
+                          {pr.inicio || "—"} → {pr.limite || "—"}
+                          {pr.creado ? ` · guardado ${fechaGuardado(pr.creado)}` : ""}
                         </div>
                       </div>
                       <div className="flex shrink-0 items-center gap-1.5">
+                        {/* v0.9.1: restaurar la versión anterior que quedó como
+                            respaldo cuando este programa fue reemplazado */}
+                        {pr.reemplazado ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            className="cns-btn-ghost h-8 shrink-0 text-xs"
+                            title={`Restaurar la versión anterior de “${pr.nombre}” (guardada ${fechaGuardado(pr.reemplazado.creado)}, ${pr.reemplazado.segments.length} momentos): la versión actual pasa a ser el respaldo, nada se pierde`}
+                            aria-label={`Restaurar la versión anterior de ${pr.nombre}`}
+                            onClick={() => restaurarAnterior(pr.id)}
+                          >
+                            <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                            Anterior
+                          </Button>
+                        ) : null}
                         {/* Carga DIRECTA (v0.9.0): sin cuadro de confirmación del
                             navegador, que podía estar bloqueado y dejar el botón
                             mudo — era la razón por la que no se podía alternar */}
@@ -2767,6 +2947,41 @@ export default function PanelView() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Aviso con Deshacer (v0.9.1): un guardado que pisó una versión anterior
+          la deja como respaldo y ofrece restaurarla durante unos segundos */}
+      {avisoReemplazo ? (
+        <div
+          className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-full border bg-[#FFFDF8]/95 px-4 py-2 shadow-lg backdrop-blur"
+          style={{ borderColor: "rgba(180,160,120,.5)" }}
+          role="status"
+        >
+          <Check
+            className="h-4 w-4 shrink-0 text-[#5A7A4A]"
+            aria-hidden="true"
+          />
+          <span className="text-xs text-[#241E16]">
+            Guardado en «{avisoReemplazo.nombre}» — la versión anterior quedó
+            como respaldo.
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            className="cns-btn-line h-7 shrink-0 text-xs"
+            onClick={() => restaurarAnterior(avisoReemplazo.id)}
+          >
+            <Undo2 className="h-3.5 w-3.5" aria-hidden="true" /> Deshacer
+          </Button>
+          <Button
+            size="sm"
+            variant="ghost"
+            className="cns-icobtn h-7 w-7 shrink-0 px-0"
+            aria-label="Cerrar el aviso"
+            onClick={() => setAvisoReemplazo(null)}
+          >
+            <X className="h-3.5 w-3.5" aria-hidden="true" />
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -3050,11 +3265,19 @@ function HelpDialog() {
           </li>
           <li>
             · ¿Ajustaste un culto que ya guardaste? Con el culto cargado aparece el
-            botón dorado <b>Guardar cambios</b>, a la derecha del título{" "}
+            botón dorado <b>Guardar en «…»</b>, a la derecha del título{" "}
             <b>Orden del culto</b> y también arriba del cuadro de <b>Programas</b>:
             un clic y el programa queda actualizado, sin volver a escribir el
-            nombre. <b>Cargar</b> cambia de un culto a otro al toque, sin
-            preguntar nada.
+            nombre. La versión que estaba guardada <b>queda como respaldo</b>{" "}
+            durante unos segundos (aviso con <b>Deshacer</b>) y siempre en la
+            lista, con el botón <b>Anterior</b> para restaurarla.{" "}
+            <b>Cargar</b> cambia de un culto a otro al toque, sin preguntar nada.
+          </li>
+          <li>
+            · Si guardás con un nombre que <b>ya existe</b>, el botón{" "}
+            <b>Guarda</b> pasa a decir <b>¿Reemplazar “…”?</b> y espera un{" "}
+            <b>segundo clic</b>: así ningún culto guardado se pisa sin querer —
+            y lo de antes siempre se puede recuperar con <b>Anterior</b>.
           </li>
           <li>
             · El botón <b>Programa</b> (arriba, a la derecha) abre la{" "}
