@@ -1044,7 +1044,6 @@ export default function PanelView() {
     } catch {
       /* sin URL o sin almacenamiento: queda el guardado local */
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const conectarNube = async () => {
@@ -1292,9 +1291,26 @@ export default function PanelView() {
   };
 
   /* Huella de los momentos (sin los id, que se regeneran en cada carga):
-     sirve para saber si lo que hay en pantalla difiere del programa guardado */
+     sirve para saber si lo que hay en pantalla difiere del programa guardado.
+     v0.9.3: la huella es CANÓNICA — arma cada campo en un orden fijo y con
+     valores por defecto. Antes comparaba el JSON crudo y un programa viejo
+     (que puede venir sin algún campo, p. ej. "cards", o con los campos en
+     otro orden tras pasar por la nube) aparecía como "con cambios" apenas
+     se lo cargaba, aunque fuera idéntico: por eso los cultos "cambiaban
+     solos" y el botón Guardar quedaba siempre encendido. */
   const huellaSegs = (segs: Segment[]) =>
-    JSON.stringify(segs.map((x) => ({ ...x, id: 0 })));
+    JSON.stringify(
+      segs.map((x) => ({
+        titulo: String(x.title ?? ""),
+        orador: String(x.speaker ?? ""),
+        minutos: Math.max(1, Math.round(Number(x.minutes) || 0)),
+        disposicion: x.layout === "script" ? "script" : "timer",
+        color: String(x.color ?? ""),
+        puntos: (Array.isArray(x.bullets) ? x.bullets : []).map((b) => String(b)),
+        guion: String(x.script ?? ""),
+        tarjeta: Boolean(x.cards),
+      })),
+    );
 
   /* Info del programa en uso: existe y ¿difiere de lo que hay en pantalla? */
   const progEnCursoInfo = useMemo(() => {
@@ -1308,7 +1324,6 @@ export default function PanelView() {
       franja.inicio === guardado.inicio &&
       franja.limite === guardado.limite;
     return { guardado, iguales };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [progEnCurso, programas, state.segments, franja.inicio, franja.limite]);
   const hayCambiosProg = progEnCursoInfo ? !progEnCursoInfo.iguales : false;
 
@@ -1402,11 +1417,22 @@ export default function PanelView() {
   };
 
   const cargarPrograma = (pr: ProgramaGuardado) => {
+    /* v0.9.3: cada momento se reconstruye de forma canónica. Los programas
+       viejos o bajados de la nube pueden venir sin algún campo (cards,
+       speaker…) o con tipos raros; así la pantalla queda siempre completa y
+       EXACTAMENTE igual al programa guardado, sin "cambios" fantasma. */
     const arr = pr.segments.map((x, i) => ({
-      ...x,
       id: uid(),
-      bullets: [...x.bullets],
-      color: (x.color || COLOR_KEYS[i % COLOR_KEYS.length]) as ColorKey,
+      title: String(x.title ?? "Momento"),
+      speaker: String(x.speaker ?? ""),
+      minutes: Math.max(1, Math.round(Number(x.minutes) || 10)),
+      layout: x.layout === "script" ? ("script" as const) : ("timer" as const),
+      color: (COLOR_KEYS as readonly string[]).includes(x.color)
+        ? (x.color as ColorKey)
+        : (COLOR_KEYS[i % COLOR_KEYS.length] as ColorKey),
+      bullets: Array.isArray(x.bullets) ? x.bullets.map((b) => String(b)) : [],
+      script: String(x.script ?? ""),
+      cards: Boolean(x.cards),
     }));
     mutate((p) => ({ ...resetService(p), segments: arr }));
     /* Programas viejos podían no traer franja horaria: si falta o no es una
