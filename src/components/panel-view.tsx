@@ -78,63 +78,67 @@ import {
 import { VERSION_APP } from "@/lib/version";
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Tema "Crema Elegante" — consola clara, sobria y delicada para la
-   Iglesia Adventista del Séptimo Día. Fondo crema #F6F1E7, tarjetas
-   blancas y letras oscuras (negro cálido #241E16, marrón #6B4A2F,
-   blanco sobre los botones marrones), acentos dorado #B08D57. Orden del
+   Tema "Neón Gamer" (v0.9.4) — consola oscura estilo videojuego para la
+   Iglesia Adventista del Séptimo Día. Fondo azul noche #0B1026 con
+   resplandores azules y violetas, tarjetas de vidrio #101735, letras
+   claras (#F1F5F9) y acentos vibrantes: cian #22D3EE, azul #3B82F6,
+   violeta #8B5CF6, verde #34D399, ámbar #FBBF24. Sin marrón. Orden del
    culto en vertical con conectores de minutos entre los bloques.
-   Tipografías: Playfair Display (títulos), Lato (cuerpo), Roboto Mono
-   (números y relojes). Todo scoping bajo .cns para NO tocar la pantalla
-   del predicador.
+   Tipografías: Space Grotesk (títulos y cuerpo), Orbitron (números y
+   relojes). Todo scoping bajo .cns para NO tocar la pantalla del
+   predicador (que usa el mismo tema con las clases .gproy).
    ═══════════════════════════════════════════════════════════════════════ */
 const ESTILO_CONSOLA = `
-@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lato:wght@400;700;900&family=Roboto+Mono:wght@500;600;700&display=swap');
-
 /* Las variables se definen también en .cns-modal, .cns-pop y .cns-menu porque
    los modales y desplegables se renderizan en un portal FUERA del div .cns,
    y sin las variables los colores caerían al tema oscuro por defecto.
-   Tema "Crema Elegante": fondo crema, tarjetas blancas, letras oscuras
-   (negro cálido, marrón, blanco) y acentos dorado y marrón. */
+   Tema "Neón Gamer" (v0.9.4): fondo azul noche con resplandores, tarjetas de
+   vidrio oscuro, acentos cian/azul/violeta y tipografías Orbitron + Space
+   Grotesk. Sin marrón. (Los nombres --marron/--oro se conservan por
+   compatibilidad, pero ya apuntan a los acentos neón.) */
 .cns, .cns-modal, .cns-pop, .cns-menu{
-  --paper:#F6F1E7; --paper-2:#F1EADC; --card:#FFFFFF; --card-soft:#FBF8F1;
-  --ink:#241E16; --ink-2:#4A3E30; --ink-mut:#8A7A64;
-  --marron:#6B4A2F; --marron-osc:#3A2C1A;
-  --oro:#B08D57; --oro-lt:#D9C493; --oro-dim:rgba(176,141,87,.14);
-  --ok:#4E7A52; --warn:#B98A2F; --danger:#B0452F;
-  --line:#E4DCCB; --line-soft:#ECE5D5;
+  --paper:#0D1330; --paper-2:rgba(148,163,184,.10); --card:#101735; --card-soft:#0D1330;
+  --ink:#F1F5F9; --ink-2:#CBD5E1; --ink-mut:#94A3B8;
+  --marron:#22D3EE; --marron-osc:#3B82F6;
+  --oro:#22D3EE; --oro-lt:rgba(34,211,238,.45); --oro-dim:rgba(34,211,238,.12);
+  --ok:#34D399; --warn:#FBBF24; --danger:#EF4444;
+  --line:rgba(148,163,184,.18); --line-soft:rgba(148,163,184,.10);
 }
 .cns{
-  font-family:'Lato','Segoe UI',system-ui,-apple-system,sans-serif;
+  font-family:'Space Grotesk','Segoe UI',system-ui,-apple-system,sans-serif;
   color:var(--ink);
   background:
-    radial-gradient(1200px 520px at 85% -10%, rgba(176,141,87,.10), transparent 60%),
-    radial-gradient(900px 480px at -8% 110%, rgba(107,74,47,.07), transparent 55%),
-    linear-gradient(180deg,#F8F4EC 0%,#F3EEE1 100%);
+    radial-gradient(1200px 520px at 85% -10%, rgba(59,130,246,.16), transparent 60%),
+    radial-gradient(900px 480px at -8% 110%, rgba(139,92,246,.13), transparent 55%),
+    linear-gradient(180deg,#0B1026 0%,#101735 100%);
   background-attachment:fixed;
   height:100dvh;
 }
-.cns ::selection{ background:rgba(176,141,87,.30); }
+.cns ::selection{ background:rgba(34,211,238,.35); }
 
 /* ── Paneles de la consola ── */
 .cns-panel{
   background:var(--card);
   border:1px solid var(--line);
   border-radius:16px;
-  box-shadow:0 1px 2px rgba(90,70,40,.05), 0 10px 30px rgba(90,70,40,.07);
+  box-shadow:0 1px 2px rgba(2,6,23,.5), 0 10px 30px rgba(2,6,23,.45);
 }
-.cns-panel-active{ border-color:rgba(176,141,87,.60); }
+.cns-panel-active{
+  border-color:rgba(34,211,238,.55);
+  box-shadow:0 0 0 1px rgba(34,211,238,.25), 0 10px 30px rgba(2,6,23,.45);
+}
 .cns-eyebrow{
   display:flex;align-items:center;gap:8px;
-  font-family:'Lato',system-ui,sans-serif;
-  font-size:10.5px;font-weight:900;letter-spacing:.30em;text-transform:uppercase;
-  color:#A3823F;
+  font-family:'Space Grotesk',system-ui,sans-serif;
+  font-size:10.5px;font-weight:700;letter-spacing:.30em;text-transform:uppercase;
+  color:#67E8F9;
 }
 .cns-eyebrow::before{
-  content:"";width:7px;height:7px;flex:none;background:var(--oro);
-  border-radius:2px;
+  content:"";width:7px;height:7px;flex:none;border-radius:2px;
+  background:linear-gradient(135deg,#22D3EE,#8B5CF6);
 }
 .cns-h2{
-  font-family:'Playfair Display',Georgia,serif;
+  font-family:'Space Grotesk','Segoe UI',sans-serif;
   font-size:20px;font-weight:700;letter-spacing:.01em;color:var(--ink);
   line-height:1.2;
 }
@@ -144,15 +148,15 @@ const ESTILO_CONSOLA = `
 /* ── Barra superior ── */
 .cns-top{
   position:sticky;top:0;z-index:40;
-  background:rgba(252,250,244,.94);
+  background:rgba(8,12,30,.92);
   backdrop-filter:blur(10px);
   border-bottom:1px solid var(--line);
-  box-shadow:0 8px 24px rgba(90,70,40,.08);
+  box-shadow:0 8px 24px rgba(2,6,23,.5);
 }
 .cns-top::after{
   content:"";display:block;height:2px;
-  background:linear-gradient(90deg,transparent 4%,var(--oro-lt) 22%,var(--oro) 50%,var(--oro-lt) 78%,transparent 96%);
-  opacity:.8;
+  background:linear-gradient(90deg,transparent 4%,rgba(34,211,238,.55) 22%,rgba(59,130,246,.75) 50%,rgba(139,92,246,.55) 78%,transparent 96%);
+  opacity:.9;
 }
 .cns-top-in{
   max-width:1440px;margin:0 auto;display:flex;flex-wrap:wrap;align-items:center;
@@ -160,25 +164,25 @@ const ESTILO_CONSOLA = `
 }
 .cns-logo{
   width:42px;height:42px;flex:none;border-radius:12px;display:grid;place-items:center;
-  color:#F5E9D2;background:linear-gradient(150deg,var(--marron) 0%,var(--marron-osc) 92%);
-  border:1px solid var(--oro-lt);
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 6px 16px rgba(58,44,26,.28);
+  color:#08111F;background:linear-gradient(150deg,#22D3EE 0%,#3B82F6 55%,#8B5CF6 100%);
+  border:1px solid rgba(34,211,238,.5);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 18px rgba(34,211,238,.30);
 }
 .cns-iglesia{
-  font-family:'Lato',system-ui,sans-serif;font-size:10px;font-weight:700;
-  letter-spacing:.24em;text-transform:uppercase;color:#A3823F;
+  font-family:'Space Grotesk',system-ui,sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.24em;text-transform:uppercase;color:#67E8F9;
 }
 .cns-titulo{
-  font-family:'Playfair Display',Georgia,serif;font-size:22px;font-weight:700;
-  letter-spacing:.08em;text-transform:uppercase;color:var(--ink);line-height:1.15;
+  font-family:'Space Grotesk','Segoe UI',sans-serif;font-size:22px;font-weight:700;
+  letter-spacing:.08em;text-transform:uppercase;color:#FFFFFF;line-height:1.15;
 }
 .cns-lema{
-  font-family:'Lato',system-ui,sans-serif;font-size:12px;color:var(--ink-mut);
+  font-family:'Space Grotesk',system-ui,sans-serif;font-size:12px;color:var(--ink-mut);
 }
 .cns-ver{
-  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;color:var(--ink-mut);
-  border:1px solid #E0D5BE;border-radius:7px;padding:3px 8px;
-  background:#FFFFFF;
+  font-family:'Orbitron',ui-monospace,monospace;font-size:10px;color:#67E8F9;
+  border:1px solid rgba(34,211,238,.35);border-radius:7px;padding:3px 8px;
+  background:rgba(34,211,238,.10);
 }
 
 /* ── Píldoras de estado y leds ── */
@@ -186,36 +190,36 @@ const ESTILO_CONSOLA = `
   display:inline-flex;align-items:center;gap:7px;border-radius:999px;
   padding:5px 12px;font-size:11px;font-weight:800;letter-spacing:.08em;
   text-transform:uppercase;border:1px solid var(--line);
-  color:var(--ink-2);background:#FFFFFF;white-space:nowrap;
+  color:var(--ink-2);background:rgba(255,255,255,.06);white-space:nowrap;
 }
-.cns-pill-live{ background:#F6EFDD;border-color:var(--oro-lt);color:#7A5A28; }
-.cns-pill-danger{ background:#F9EDE8;border-color:rgba(176,69,47,.40);color:#8A3A26; }
-.cns-pill-warn{ background:#F8F0DC;border-color:#E0C98C;color:#8A6A1F; }
-.cns-pill-ok{ background:#EAF0E6;border-color:#C2D0B4;color:#3E6B4A; }
+.cns-pill-live{ background:rgba(34,211,238,.14);border-color:rgba(34,211,238,.45);color:#A5F3FC; }
+.cns-pill-danger{ background:rgba(239,68,68,.14);border-color:rgba(239,68,68,.45);color:#FCA5A5; }
+.cns-pill-warn{ background:rgba(251,191,36,.14);border-color:rgba(251,191,36,.45);color:#FDE68A; }
+.cns-pill-ok{ background:rgba(52,211,153,.14);border-color:rgba(52,211,153,.45);color:#A7F3D0; }
 .cns-pill-dim{ color:var(--ink-mut); }
-.cns-led{ width:8px;height:8px;flex:none;border-radius:999px;background:#B4A78E; }
+.cns-led{ width:8px;height:8px;flex:none;border-radius:999px;background:#64748B; }
 .cns-led-blink{ background:var(--danger);animation:cns-pulse 1.1s ease-in-out infinite; }
-.cns-pill-live .cns-led{ background:#A3823F;animation:cns-pulse 1.1s ease-in-out infinite; }
+.cns-pill-live .cns-led{ background:#22D3EE;animation:cns-pulse 1.1s ease-in-out infinite; }
 .cns-led-ok{ background:var(--ok);animation:cns-pulse 2s ease-in-out infinite; }
 .cns-led-warn{ background:var(--warn); }
 @keyframes cns-pulse{ 0%,100%{opacity:1} 50%{opacity:.35} }
 
 /* ── Botones ── */
 .cns .cns-btn-gold{
-  background:linear-gradient(135deg,#7A563A 0%,#5C4327 100%);color:#FFFFFF;
-  border:1px solid rgba(217,196,147,.65);font-weight:800;letter-spacing:.03em;
-  box-shadow:0 6px 18px rgba(92,67,39,.28), inset 0 1px 0 rgba(255,255,255,.18);
+  background:linear-gradient(135deg,#22D3EE 0%,#3B82F6 100%);color:#08111F;
+  border:1px solid rgba(34,211,238,.65);font-weight:800;letter-spacing:.03em;
+  box-shadow:0 6px 18px rgba(34,211,238,.30), inset 0 1px 0 rgba(255,255,255,.35);
 }
-.cns .cns-btn-gold:hover{ background:linear-gradient(135deg,#8A6444 0%,#6B4E30 100%);color:#FFFFFF; }
+.cns .cns-btn-gold:hover{ background:linear-gradient(135deg,#67E8F9 0%,#60A5FA 100%);color:#08111F; }
 .cns .cns-btn-line{
-  background:#FFFFFF;border:1px solid #D5C7A9;
-  color:var(--marron);font-weight:700;
+  background:rgba(255,255,255,.07);border:1px solid rgba(148,163,184,.28);
+  color:var(--ink-2);font-weight:700;
 }
-.cns .cns-btn-line:hover{ background:#F6EFDD;border-color:#C9B68C;color:#5C4327; }
+.cns .cns-btn-line:hover{ background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.45);color:#A5F3FC; }
 .cns .cns-btn-ghost{ color:var(--ink-mut); }
-.cns .cns-btn-ghost:hover{ background:var(--paper-2);color:#5C4327; }
+.cns .cns-btn-ghost:hover{ background:var(--paper-2);color:#E2E8F0; }
 .cns .cns-icobtn{ color:var(--ink-mut); }
-.cns .cns-icobtn:hover{ background:var(--paper-2);color:#5C4327; }
+.cns .cns-icobtn:hover{ background:var(--paper-2);color:#A5F3FC; }
 
 /* ── Orden del culto: cajas grandes en vertical con conectores ── */
 .cns-box{
@@ -223,27 +227,27 @@ const ESTILO_CONSOLA = `
   align-items:center;gap:12px;
   border-radius:14px;border:1px solid var(--line);
   background:var(--card);padding:13px 14px 13px 12px;cursor:pointer;
-  box-shadow:0 1px 2px rgba(90,70,40,.05), 0 5px 14px rgba(90,70,40,.05);
+  box-shadow:0 1px 2px rgba(2,6,23,.5), 0 5px 14px rgba(2,6,23,.35);
   transition:border-color .25s ease-in-out,box-shadow .25s ease-in-out;
 }
 .cns-box:hover{
-  border-color:#D3C5A8;
-  box-shadow:0 2px 4px rgba(90,70,40,.06), 0 8px 20px rgba(90,70,40,.09);
+  border-color:rgba(34,211,238,.45);
+  box-shadow:0 2px 4px rgba(2,6,23,.5), 0 8px 20px rgba(34,211,238,.12);
 }
 .cns-box-done{ opacity:.55; }
 .cns-box-done .cns-box-title{ text-decoration:line-through; }
 .cns-box-now{
-  border-color:var(--oro);
-  background:linear-gradient(180deg,#FFFDF6 0%,#FFFFFF 100%);
-  box-shadow:0 0 0 1px var(--oro-lt), 0 10px 26px rgba(176,141,87,.22);
+  border-color:rgba(34,211,238,.60);
+  background:linear-gradient(180deg,rgba(34,211,238,.08) 0%,rgba(59,130,246,.06) 100%);
+  box-shadow:0 0 0 1px rgba(34,211,238,.35), 0 10px 26px rgba(34,211,238,.18);
 }
 .cns-box-num{
   width:34px;height:34px;flex:none;display:grid;place-items:center;
   border-radius:10px;border:1px solid var(--line);
-  background:var(--paper);color:var(--marron);
-  font-family:'Roboto Mono',ui-monospace,monospace;font-size:13px;font-weight:700;
+  background:var(--paper);color:#67E8F9;
+  font-family:'Orbitron',ui-monospace,monospace;font-size:12px;font-weight:700;
 }
-.cns-box-now .cns-box-num{ background:#F6EFDD;border-color:var(--oro-lt);color:#7A5A28; }
+.cns-box-now .cns-box-num{ background:rgba(34,211,238,.15);border-color:rgba(34,211,238,.45);color:#A5F3FC; }
 .cns-box-title{
   font-size:15.5px;font-weight:700;color:var(--ink);letter-spacing:.01em;line-height:1.25;
 }
@@ -264,50 +268,50 @@ const ESTILO_CONSOLA = `
   content:"";width:4.5px;height:4.5px;flex:none;border-radius:999px;background:var(--oro);
 }
 .cns-box-punto > span{ overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.cns-box-punto-mas{ font-size:10px;font-weight:700;letter-spacing:.05em;color:var(--oro); }
+.cns-box-punto-mas{ font-size:10px;font-weight:700;letter-spacing:.05em;color:#67E8F9; }
 .cns-box-punto-mas::before{ display:none; }
 .cns-box-now .cns-box-punto{ color:var(--ink-2); }
 .cns-minchip{
-  flex:none;font-family:'Roboto Mono',ui-monospace,monospace;font-size:11px;font-weight:700;
-  color:var(--marron);background:var(--paper);border:1px solid #E0D5BE;border-radius:999px;
+  flex:none;font-family:'Orbitron',ui-monospace,monospace;font-size:10px;font-weight:700;
+  color:#A5F3FC;background:rgba(34,211,238,.10);border:1px solid rgba(34,211,238,.30);border-radius:999px;
   padding:3px 9px;white-space:nowrap;
 }
-.cns-box-now .cns-minchip{ background:#F6EFDD;border-color:var(--oro-lt);color:#7A5A28; }
+.cns-box-now .cns-minchip{ background:rgba(34,211,238,.16);border-color:rgba(34,211,238,.50);color:#A5F3FC; }
 @media (max-width:880px){
   .cns-box{ grid-template-columns:auto minmax(0,1fr) auto; }
   .cns-box-side{ display:none; }
 }
 .cns-tipo{
   display:inline-flex;align-items:center;border-radius:999px;
-  padding:2.5px 9px;font-size:9.5px;font-weight:900;
+  padding:2.5px 9px;font-size:9.5px;font-weight:800;
   letter-spacing:.14em;text-transform:uppercase;border:1px solid;
   white-space:nowrap;
 }
-.cns-tipo-inicio{ background:#F6EFDD;border-color:#E0CFA8;color:#7A5A28; }
-.cns-tipo-sermon{ background:#F0E7DA;border-color:#D8C4A8;color:#5C4327; }
-.cns-tipo-ninos{ background:#EBEFE3;border-color:#C9D4BA;color:#4E6647; }
-.cns-tipo-general{ background:#F3EFE6;border-color:#DED4C0;color:#6B5844; }
+.cns-tipo-inicio{ background:rgba(34,211,238,.12);border-color:rgba(34,211,238,.40);color:#A5F3FC; }
+.cns-tipo-sermon{ background:rgba(139,92,246,.14);border-color:rgba(139,92,246,.45);color:#DDD6FE; }
+.cns-tipo-ninos{ background:rgba(52,211,153,.13);border-color:rgba(52,211,153,.40);color:#A7F3D0; }
+.cns-tipo-general{ background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.40);color:#BFDBFE; }
 .cns-connector{ position:relative;height:34px; }
 .cns-connector::before{
   content:"";position:absolute;left:28px;top:2px;bottom:2px;width:2px;
-  border-radius:2px;background:#DCD0B6;
+  border-radius:2px;background:rgba(148,163,184,.22);
 }
 .cns-connector-pill{
   position:absolute;left:28px;top:50%;transform:translate(-50%,-50%);z-index:1;
   display:inline-flex;align-items:center;
-  background:var(--card);border:1px solid #E0D5BE;border-radius:999px;
+  background:var(--card);border:1px solid rgba(148,163,184,.25);border-radius:999px;
   padding:3px 10px;
-  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10.5px;font-weight:700;
-  color:var(--marron);box-shadow:0 1px 3px rgba(90,70,40,.10);white-space:nowrap;
+  font-family:'Orbitron',ui-monospace,monospace;font-size:9.5px;font-weight:700;
+  color:#A5F3FC;box-shadow:0 1px 3px rgba(2,6,23,.5);white-space:nowrap;
 }
 .cns-box-add{
   display:flex;align-items:center;justify-content:center;gap:8px;
-  border-radius:14px;border:1.5px dashed #D3C5A8;background:transparent;
+  border-radius:14px;border:1.5px dashed rgba(148,163,184,.30);background:transparent;
   padding:12px 14px;margin-top:2px;
   font-size:12.5px;font-weight:700;color:var(--ink-mut);
   transition:border-color .25s ease-in-out,color .25s ease-in-out,background .25s ease-in-out;
 }
-.cns-box-add:hover{ border-color:var(--oro);color:var(--marron);background:var(--oro-dim); }
+.cns-box-add:hover{ border-color:var(--oro);color:#67E8F9;background:var(--oro-dim); }
 
 /* ── Franja horaria a la par del orden ── */
 .cns-franja{
@@ -316,34 +320,34 @@ const ESTILO_CONSOLA = `
   border-radius:12px;padding:8px 12px;margin:4px 12px 0;
 }
 .cns-franja-lab{
-  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;
+  font-family:'Orbitron',ui-monospace,monospace;font-size:9px;
   letter-spacing:.10em;text-transform:uppercase;color:var(--ink-mut);
   white-space:nowrap;
 }
 .cns-franja-lab b{ color:var(--ink-2);font-weight:700;letter-spacing:0; }
 .cns-franja input{
-  font-family:'Roboto Mono',ui-monospace,monospace;font-size:12px;color:var(--ink);
-  height:28px;width:88px;padding:0 6px;background:#FFFFFF;
+  font-family:'Orbitron',ui-monospace,monospace;font-size:11px;color:var(--ink);
+  height:28px;width:88px;padding:0 6px;background:rgba(255,255,255,.07);
 }
 .cns-franja input:focus{
-  outline:none;border-color:#C9B68C;box-shadow:0 0 0 3px rgba(176,141,87,.20);
+  outline:none;border-color:rgba(34,211,238,.55);box-shadow:0 0 0 3px rgba(34,211,238,.18);
 }
 .cns-hora{
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
-  font-family:'Roboto Mono',ui-monospace,monospace;font-size:11.5px;font-weight:700;
-  color:#A3823F;white-space:nowrap;
+  font-family:'Orbitron',ui-monospace,monospace;font-size:10.5px;font-weight:700;
+  color:#67E8F9;white-space:nowrap;
 }
 .cns-hora small{
-  font-size:8.5px;font-weight:900;letter-spacing:.12em;color:var(--marron);
+  font-size:8.5px;font-weight:800;letter-spacing:.12em;color:#94A3B8;
 }
-.cns-hora-now span{ color:var(--marron); }
+.cns-hora-now span{ color:#A5F3FC; }
 .cns-fin{
   display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
   border:1px solid var(--line);background:var(--card-soft);
   border-radius:14px;padding:10px 14px;
 }
 .cns-fin-titulo{
-  font-family:'Playfair Display',Georgia,serif;font-size:15px;font-weight:700;
+  font-family:'Space Grotesk','Segoe UI',sans-serif;font-size:15px;font-weight:700;
   color:var(--ink);
 }
 
@@ -351,88 +355,90 @@ const ESTILO_CONSOLA = `
 .cns-menu{
   position:absolute;top:calc(100% + 4px);right:2px;z-index:60;min-width:168px;
   width:max-content;max-width:min(260px,92vw);
-  border-radius:12px;border:1px solid #E0D5BE;background:#FFFFFF;
-  box-shadow:0 18px 40px rgba(60,45,25,.20);
+  border-radius:12px;border:1px solid rgba(148,163,184,.25);background:#0D1330;
+  box-shadow:0 18px 40px rgba(2,6,23,.65);
   padding:4px;display:flex;flex-direction:column;
 }
 .cns-menu button{
   display:block;border-radius:8px;padding:7px 10px;
   font-size:12.5px;font-weight:700;color:var(--ink-2);text-align:left;
 }
-.cns-menu button:hover{ background:var(--paper-2);color:#5C4327; }
+.cns-menu button:hover{ background:rgba(34,211,238,.12);color:#A5F3FC; }
 .cns-menu button:disabled{ opacity:.35;pointer-events:none; }
 
 /* ── Etiquetas chiquitas de los ajustes en línea ── */
 .cns-setlab{
-  font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;
+  font-family:'Orbitron',ui-monospace,monospace;font-size:9px;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-mut);
 }
 
 /* ── Reloj y medidor ── */
 .cns-timer{
-  font-family:'Roboto Mono',ui-monospace,monospace;font-weight:700;
-  letter-spacing:-0.01em;line-height:.95;
+  font-family:'Orbitron',ui-monospace,monospace;font-weight:700;
+  letter-spacing:.02em;line-height:.95;
+  text-shadow:0 0 16px rgba(34,211,238,.30);
 }
 .cns-timer-label{
-  font-family:'Lato',system-ui,sans-serif;font-size:10px;font-weight:900;
-  letter-spacing:.3em;text-transform:uppercase;color:#A3823F;text-align:center;
+  font-family:'Space Grotesk',system-ui,sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.3em;text-transform:uppercase;color:#67E8F9;text-align:center;
 }
 .cns-kbd{
-  display:inline-block;font-family:'Roboto Mono',ui-monospace,monospace;font-size:10px;
-  border:1px solid #E0D5BE;border-bottom-width:2px;border-radius:5px;
-  padding:1px 6px;background:#FAF6EC;color:var(--ink-2);
+  display:inline-block;font-family:'Orbitron',ui-monospace,monospace;font-size:9px;
+  border:1px solid rgba(148,163,184,.30);border-bottom-width:2px;border-radius:5px;
+  padding:1px 6px;background:rgba(255,255,255,.07);color:var(--ink-2);
 }
 .cns-alert-danger{
   display:flex;gap:10px;align-items:flex-start;border-radius:12px;
-  border:1px solid rgba(176,69,47,.35);background:#F9EDE8;
-  padding:12px 14px;font-size:13px;color:#7C3A26;
+  border:1px solid rgba(239,68,68,.45);background:rgba(239,68,68,.12);
+  padding:12px 14px;font-size:13px;color:#FCA5A5;
 }
 
 /* ── Campos ── */
 .cns .cns-in, .cns-modal .cns-in{
-  background:#FFFFFF;border:1px solid #DCD2BE;
+  background:rgba(255,255,255,.07);border:1px solid rgba(148,163,184,.25);
   color:var(--ink) !important;border-radius:10px;
 }
-.cns .cns-in::placeholder, .cns-modal .cns-in::placeholder{ color:#A89878; }
+.cns .cns-in::placeholder, .cns-modal .cns-in::placeholder{ color:#64748B; }
 .cns .cns-in:focus-visible, .cns-modal .cns-in:focus-visible,
 .cns .cns-in:focus, .cns-modal .cns-in:focus{
-  border-color:#C9B68C;box-shadow:0 0 0 3px rgba(176,141,87,.20);
+  border-color:rgba(34,211,238,.55);box-shadow:0 0 0 3px rgba(34,211,238,.18);
 }
 .cns button[role="switch"], .cns-modal button[role="switch"]{
-  border-color:#DCD2BE;
+  border-color:rgba(148,163,184,.30);
 }
 .cns button[role="switch"][data-state="unchecked"],
 .cns-modal button[role="switch"][data-state="unchecked"]{
-  background:#DDD3BC !important;border-color:#CFC3A8 !important;
+  background:rgba(148,163,184,.35) !important;border-color:rgba(148,163,184,.40) !important;
 }
 .cns button[role="switch"][data-state="checked"],
 .cns-modal button[role="switch"][data-state="checked"]{
   background:var(--marron) !important;border-color:var(--marron) !important;
+  box-shadow:0 0 10px rgba(34,211,238,.35);
 }
 .cns button[role="switch"] > span, .cns-modal button[role="switch"] > span{
   background:#FFFFFF !important;
 }
 .cns button[role="switch"][data-state="checked"] > span,
 .cns-modal button[role="switch"][data-state="checked"] > span{
-  background:#FFFFFF !important;
+  background:#08111F !important;
 }
 
 /* ── Modales y desplegables (se renderizan fuera de .cns, en un portal) ── */
 .cns-modal{
-  background:linear-gradient(180deg,#FFFFFF,#FBF7EE);
-  border:1px solid #E0D5BE;color:var(--ink);border-radius:16px;
-  box-shadow:0 30px 70px rgba(60,45,25,.30);
+  background:linear-gradient(180deg,#101735,#0D1330);
+  border:1px solid rgba(148,163,184,.25);color:var(--ink);border-radius:16px;
+  box-shadow:0 30px 70px rgba(2,6,23,.7);
 }
 .cns-modal label{ color:var(--ink-2) !important;font-weight:700; }
 .cns-modal .text-muted-foreground{ color:var(--ink-mut) !important; }
 .cns-modal [data-slot="dialog-close"], .cns-modal button.dialog-close{ color:var(--ink-mut); }
 .cns-pop{
-  background:#FFFFFF;border:1px solid #E0D5BE;border-radius:12px;
-  color:var(--ink);box-shadow:0 18px 40px rgba(60,45,25,.20);
-  font-family:'Lato','Segoe UI',system-ui,sans-serif;
+  background:#0D1330;border:1px solid rgba(148,163,184,.25);border-radius:12px;
+  color:var(--ink);box-shadow:0 18px 40px rgba(2,6,23,.65);
+  font-family:'Space Grotesk','Segoe UI',system-ui,sans-serif;
 }
 .cns-pop [role="option"]{ color:var(--ink-2) !important; }
-.cns-pop [role="option"][data-highlighted]{ background:var(--paper-2);color:#5C4327; }
+.cns-pop [role="option"][data-highlighted]{ background:rgba(34,211,238,.14);color:#A5F3FC; }
 
 /* ── Detalles ── */
 .cns-sep{ height:1px;background:var(--line-soft); }
@@ -492,64 +498,66 @@ function tipoDeMomento(titulo: string): { label: string; tone: string } {
    ═══════════════════════════════════════════════════════════════════════ */
 const ESTILO_HOJA = `
 .cns-hoja-portal{
-  --h-ink:#241E16; --h-ink2:#4A3E30; --h-mut:#8A7A64;
-  --h-oro:#B08D57; --h-line:#D8CDB6; --h-danger:#B0452F;
+  --h-ink:#1E293B; --h-ink2:#334155; --h-mut:#64748B;
+  --h-oro:#0284C7; --h-line:#CBD5E1; --h-danger:#B91C1C;
   position:fixed; inset:0; z-index:70; overflow-y:auto;
-  background:rgba(36,30,22,.55);
-  font-family:'Lato','Segoe UI',system-ui,-apple-system,sans-serif;
+  background:rgba(2,6,23,.72);
+  font-family:'Space Grotesk','Segoe UI',system-ui,-apple-system,sans-serif;
 }
 .cns-hoja-col{ max-width:760px; margin:0 auto; padding:22px 14px 40px; }
 
-/* Barra de botones y campos editables (solo pantalla, nunca se imprime) */
+/* Barra de botones y campos editables (solo pantalla, nunca se imprime):
+   vidrio oscuro con acentos neón. */
 .cns-hoja-barra{
-  background:#FBF8F1; border:1px solid #E4DCCB; border-radius:14px;
-  box-shadow:0 10px 30px rgba(0,0,0,.25);
+  background:#101735; border:1px solid rgba(148,163,184,.22); border-radius:14px;
+  box-shadow:0 10px 30px rgba(2,6,23,.6);
   padding:12px 16px; display:flex; flex-wrap:wrap; gap:10px 14px;
-  align-items:flex-start; color:#241E16;
+  align-items:flex-start; color:#F1F5F9;
 }
 .cns-hoja-barra-tit{
-  font-family:'Playfair Display',Georgia,serif; font-size:17px; font-weight:700;
+  font-family:'Space Grotesk','Segoe UI',sans-serif; font-size:17px; font-weight:700;
 }
 .cns-hoja-barra-sub{
-  font-size:11.5px; color:#8A7A64; margin-top:2px; max-width:420px; line-height:1.5;
+  font-size:11.5px; color:#94A3B8; margin-top:2px; max-width:420px; line-height:1.5;
 }
 .cns-hoja-barra-btns{ margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
 .cns-hoja-btn{
   display:inline-flex; align-items:center; gap:6px; border-radius:999px;
   padding:7px 14px; font-size:12px; font-weight:800; letter-spacing:.04em;
-  border:1px solid #E0D5BE; background:#FFFFFF; color:#241E16; cursor:pointer;
+  border:1px solid rgba(148,163,184,.28); background:rgba(255,255,255,.07); color:#F1F5F9; cursor:pointer;
 }
-.cns-hoja-btn:hover{ background:#F6EFDD; }
+.cns-hoja-btn:hover{ background:rgba(34,211,238,.12); border-color:rgba(34,211,238,.45); color:#A5F3FC; }
 .cns-hoja-btn-gold{
   display:inline-flex; align-items:center; gap:6px; border-radius:999px;
   padding:7px 14px; font-size:12px; font-weight:800; letter-spacing:.04em;
-  border:none; color:#F5E9D2; cursor:pointer;
-  background:linear-gradient(150deg,#6B4A2F 0%,#3A2C1A 92%);
-  box-shadow:0 4px 12px rgba(58,44,26,.25);
+  border:1px solid rgba(34,211,238,.65); color:#08111F; cursor:pointer;
+  background:linear-gradient(135deg,#22D3EE 0%,#3B82F6 100%);
+  box-shadow:0 4px 12px rgba(34,211,238,.30);
 }
-.cns-hoja-btn-gold:hover{ filter:brightness(1.08); }
+.cns-hoja-btn-gold:hover{ filter:brightness(1.12); }
 .cns-hoja-campos{
   display:flex; flex-wrap:wrap; gap:10px 14px;
-  background:rgba(251,248,241,.96); border:1px solid #E4DCCB;
-  border-radius:12px; padding:10px 16px; margin-top:10px; color:#241E16;
+  background:rgba(16,23,53,.96); border:1px solid rgba(148,163,184,.22);
+  border-radius:12px; padding:10px 16px; margin-top:10px; color:#F1F5F9;
 }
 .cns-hoja-campos label{
   display:flex; flex-direction:column; gap:3px;
   font-size:10.5px; font-weight:800; letter-spacing:.14em;
-  text-transform:uppercase; color:#A3823F;
+  text-transform:uppercase; color:#67E8F9;
 }
 .cns-hoja-campos label.grow{ flex:1 1 220px; }
 .cns-hoja-campos input{
-  background:#fff; border:1px solid #E0D5BE; border-radius:8px;
-  padding:6px 10px; font-size:13px; color:#241E16;
-  font-family:'Lato',sans-serif; min-width:170px;
+  background:rgba(255,255,255,.07); border:1px solid rgba(148,163,184,.25); border-radius:8px;
+  padding:6px 10px; font-size:13px; color:#F1F5F9;
+  font-family:'Space Grotesk',sans-serif; min-width:170px;
 }
-.cns-hoja-campos input:focus{ outline:2px solid rgba(176,141,87,.45); outline-offset:1px; }
+.cns-hoja-campos input:focus{ outline:2px solid rgba(34,211,238,.50); outline-offset:1px; }
 
-/* La hoja propiamente dicha: blanca, sobria, A4 */
+/* La hoja propiamente dicha: blanca, sobria, A4 — acentos azul moderno,
+   sin marrón. Se imprime tal cual. */
 .cns-hoja{
-  background:#fff; border:1px solid #E4DCCB; border-radius:6px;
-  box-shadow:0 14px 40px rgba(0,0,0,.28);
+  background:#fff; border:1px solid #CBD5E1; border-radius:6px;
+  box-shadow:0 14px 40px rgba(0,0,0,.35);
   padding:34px 38px; color:var(--h-ink); margin-top:14px;
 }
 .cns-hoja-iglesia{
@@ -557,7 +565,7 @@ const ESTILO_HOJA = `
   letter-spacing:.26em; text-transform:uppercase; color:var(--h-oro);
 }
 .cns-hoja-titulo{
-  font-family:'Playfair Display',Georgia,serif; font-size:30px; font-weight:700;
+  font-family:'Space Grotesk','Segoe UI',sans-serif; font-size:30px; font-weight:700;
   text-align:center; letter-spacing:.04em; text-transform:uppercase;
   margin:10px 0 0; color:var(--h-ink); line-height:1.15;
 }
@@ -585,25 +593,25 @@ const ESTILO_HOJA = `
   vertical-align:top; font-size:13px; color:var(--h-ink);
 }
 .cns-hoja-hora{
-  font-family:'Roboto Mono',ui-monospace,monospace; font-weight:600;
+  font-family:'Orbitron',ui-monospace,monospace; font-weight:600; font-size:11px;
   white-space:nowrap; color:var(--h-ink2);
 }
 .cns-hoja-num{
   width:26px; color:var(--h-mut);
-  font-family:'Roboto Mono',ui-monospace,monospace;
+  font-family:'Orbitron',ui-monospace,monospace; font-size:10px;
 }
 .cns-hoja-momento b{ font-size:13.5px; font-weight:700; }
 .cns-hoja-momento small{
   display:block; font-size:10.5px; color:var(--h-mut); margin-top:1px;
 }
 .cns-hoja-min{
-  font-family:'Roboto Mono',ui-monospace,monospace;
+  font-family:'Orbitron',ui-monospace,monospace; font-size:11px;
   text-align:right; white-space:nowrap;
 }
 .cns-hoja-vacio{ color:var(--h-mut); font-style:italic; padding:18px 0; }
 .cns-hoja-pie{
   margin-top:16px; padding-top:10px; border-top:2px solid var(--h-ink);
-  font-family:'Roboto Mono',ui-monospace,monospace; font-size:12.5px;
+  font-family:'Orbitron',ui-monospace,monospace; font-size:11px;
   font-weight:600; color:var(--h-ink2); text-align:center;
 }
 .cns-hoja-alerta{
@@ -611,20 +619,20 @@ const ESTILO_HOJA = `
   font-weight:700; color:var(--h-danger);
 }
 
-/* Texto para WhatsApp / SMS */
+/* Texto para WhatsApp / SMS (solo pantalla: vidrio oscuro) */
 .cns-hoja-txt{
-  margin-top:14px; background:#FBF8F1; border:1px solid #E4DCCB;
-  border-radius:12px; padding:12px 16px 14px; color:#241E16;
+  margin-top:14px; background:#101735; border:1px solid rgba(148,163,184,.22);
+  border-radius:12px; padding:12px 16px 14px; color:#F1F5F9;
 }
 .cns-hoja-txt-tit{
-  font-size:10.5px; font-weight:900; letter-spacing:.22em;
-  text-transform:uppercase; color:#A3823F;
+  font-size:10.5px; font-weight:800; letter-spacing:.22em;
+  text-transform:uppercase; color:#67E8F9;
 }
 .cns-hoja-txt-area{
-  margin-top:8px; width:100%; background:#fff; border:1px solid #E0D5BE;
+  margin-top:8px; width:100%; background:rgba(255,255,255,.07); border:1px solid rgba(148,163,184,.25);
   border-radius:10px; padding:10px 12px;
-  font-family:'Roboto Mono',ui-monospace,monospace; font-size:12px;
-  line-height:1.55; color:#241E16; resize:vertical; white-space:pre;
+  font-family:'Orbitron',ui-monospace,monospace; font-size:11px;
+  line-height:1.55; color:#F1F5F9; resize:vertical; white-space:pre;
 }
 
 /* ── Impresión: solo la hoja, limpia, con márgenes de A4 ── */
@@ -1681,10 +1689,10 @@ export default function PanelView() {
 
   const counterColor =
     phase === "overtime"
-      ? "text-[#B0452F]"
+      ? "text-[#EF4444]"
       : phase === "warning"
-        ? "text-[#B98A2F]"
-        : "text-[#241E16]";
+        ? "text-[#FBBF24]"
+        : "text-[#F1F5F9]";
 
   const statusPill = (() => {
     if (state.status === "finished") {
@@ -2063,7 +2071,7 @@ export default function PanelView() {
                   className={cn(
                     "h-7 shrink-0 text-xs",
                     confirmarPlantilla
-                      ? "border border-[#B0452F] text-[#B0452F] hover:bg-[#F9EDE8] hover:text-[#B0452F]"
+                      ? "border border-[#EF4444] text-[#EF4444] hover:bg-[rgba(239,68,68,.12)] hover:text-[#EF4444]"
                       : "cns-btn-ghost",
                   )}
                   title="Cargar de nuevo el programa sabático de ejemplo (reemplaza los momentos actuales)"
@@ -2078,7 +2086,7 @@ export default function PanelView() {
             {/* Franja horaria: la hora real a la par del programa */}
             <div className="cns-franja mt-1.5">
               <Clock
-                className="h-3.5 w-3.5 shrink-0 text-[#A3823F]"
+                className="h-3.5 w-3.5 shrink-0 text-[#67E8F9]"
                 aria-hidden="true"
               />
               <span className="cns-franja-lab">Franja horaria</span>
@@ -2397,12 +2405,12 @@ export default function PanelView() {
                     <Progress
                       value={totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0}
                       className={cn(
-                        "mt-2 h-1.5 bg-[#EDE4D0]",
+                        "mt-2 h-1.5 bg-[rgba(148,163,184,.18)]",
                         phase === "overtime"
-                          ? "[&>div]:bg-[#B0452F]"
+                          ? "[&>div]:bg-[#EF4444]"
                           : phase === "warning"
-                            ? "[&>div]:bg-[#C08A2E]"
-                            : "[&>div]:bg-[#7A5A3A]",
+                            ? "[&>div]:bg-[#FBBF24]"
+                            : "[&>div]:bg-[#38BDF8]",
                       )}
                     />
                     <div className="mt-1.5 grid grid-cols-3 gap-1 text-center font-mono text-muted-foreground">
@@ -2410,7 +2418,7 @@ export default function PanelView() {
                         <div className="text-[9px] tracking-[0.14em]">
                           TRANSCURRIDO
                         </div>
-                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                        <div className="mt-0.5 text-[11px] font-bold text-[#CBD5E1]">
                           {fmtHMS(Math.floor(elapsed / 1000))}
                         </div>
                       </div>
@@ -2418,7 +2426,7 @@ export default function PanelView() {
                         <div className="text-[9px] tracking-[0.14em]">
                           RESTANTE CULTO
                         </div>
-                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                        <div className="mt-0.5 text-[11px] font-bold text-[#CBD5E1]">
                           {fmtMin(plannedRemain)}
                         </div>
                       </div>
@@ -2426,7 +2434,7 @@ export default function PanelView() {
                         <div className="text-[9px] tracking-[0.14em]">
                           PLANIFICADO
                         </div>
-                        <div className="mt-0.5 text-[11px] font-bold text-[#4A3E30]">
+                        <div className="mt-0.5 text-[11px] font-bold text-[#CBD5E1]">
                           {seg?.minutes} MIN
                         </div>
                       </div>
@@ -2513,9 +2521,9 @@ export default function PanelView() {
                     </div>
 
                     {seg && seg.cards ? (
-                      <div className="mt-3 space-y-2 rounded-xl border-2 border-dashed border-[rgba(176,141,87,0.45)] bg-[rgba(176,141,87,0.08)] p-2.5">
+                      <div className="mt-3 space-y-2 rounded-xl border-2 border-dashed border-[rgba(139,92,246,0.45)] bg-[rgba(139,92,246,0.10)] p-2.5">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#8A6A30]">
+                          <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-[#DDD6FE]">
                             Tarjeta en pantalla · editable
                           </div>
                           <Switch
@@ -2570,7 +2578,7 @@ export default function PanelView() {
                         </div>
                       </div>
                     ) : seg ? (
-                      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[#DCD2BE] bg-[#F6F1E6] p-2.5">
+                      <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-dashed border-[rgba(148,163,184,.25)] bg-[#0D1330] p-2.5">
                         <div className="min-w-0">
                           <div className="text-[11px] font-bold uppercase tracking-[0.2em] text-muted-foreground">
                             Tarjeta en pantalla
@@ -2709,7 +2717,7 @@ export default function PanelView() {
             <DialogDescription>
               Guardá los tiempos de cada tipo de culto (mañana, evangelismo, jóvenes,
               oración…) y cargalos cuando quieras: después los ajustás en vivo. El
-              botón dorado <b>Guardar en «…»</b> actualiza el culto que estás
+              botón celeste <b>Guardar en «…»</b> actualiza el culto que estás
               usando y deja la versión anterior como respaldo; <b>Cargar</b>{" "}
               cambia de culto al toque, sin preguntar nada.
               Todo también viaja a un <b>servidor</b> como respaldo: con el código,
@@ -2724,12 +2732,12 @@ export default function PanelView() {
                 className="flex flex-wrap items-center justify-between gap-2 rounded-xl border p-2.5"
                 style={{
                   borderColor: hayCambiosProg
-                    ? "rgba(176,141,87,.55)"
-                    : "rgba(180,160,120,.35)",
+                    ? "rgba(34,211,238,.55)"
+                    : "rgba(148,163,184,.35)",
                 }}
               >
                 <div className="min-w-0">
-                  <div className="text-sm font-bold text-[#241E16]">
+                  <div className="text-sm font-bold text-[#F1F5F9]">
                     Estás usando «{progEnCurso}»
                   </div>
                   <div className="text-[11px] text-muted-foreground">
@@ -2822,7 +2830,7 @@ export default function PanelView() {
             {/* Guardado en el servidor: código de sincronización entre computadoras */}
             <div
               className="space-y-2 rounded-xl border p-2.5"
-              style={{ borderColor: "rgba(180,160,120,.35)" }}
+              style={{ borderColor: "rgba(148,163,184,.35)" }}
             >
               <div className="flex items-center justify-between gap-2">
                 <Label className="text-xs">Guardado en el servidor</Label>
@@ -2895,10 +2903,10 @@ export default function PanelView() {
                     <li
                       key={pr.id}
                       className="flex items-center justify-between gap-2 rounded-xl border p-2.5"
-                      style={{ borderColor: "rgba(180,160,120,.35)" }}
+                      style={{ borderColor: "rgba(148,163,184,.35)" }}
                     >
                       <div className="min-w-0">
-                        <div className="text-sm font-bold text-[#241E16]">
+                        <div className="text-sm font-bold text-[#F1F5F9]">
                           {pr.nombre}
                         </div>
                         {/* v0.9.1: la franja y la fecha guardadas se ven ANTES
@@ -2977,15 +2985,15 @@ export default function PanelView() {
           la deja como respaldo y ofrece restaurarla durante unos segundos */}
       {avisoReemplazo ? (
         <div
-          className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-full border bg-[#FFFDF8]/95 px-4 py-2 shadow-lg backdrop-blur"
-          style={{ borderColor: "rgba(180,160,120,.5)" }}
+          className="fixed bottom-4 left-1/2 z-50 flex -translate-x-1/2 flex-wrap items-center justify-center gap-2 rounded-full border bg-[#101735]/95 px-4 py-2 shadow-lg backdrop-blur"
+          style={{ borderColor: "rgba(148,163,184,.5)" }}
           role="status"
         >
           <Check
-            className="h-4 w-4 shrink-0 text-[#5A7A4A]"
+            className="h-4 w-4 shrink-0 text-[#34D399]"
             aria-hidden="true"
           />
-          <span className="text-xs text-[#241E16]">
+          <span className="text-xs text-[#F1F5F9]">
             Guardado en «{avisoReemplazo.nombre}» — la versión anterior quedó
             como respaldo.
           </span>
@@ -3098,7 +3106,7 @@ function SegmentEditor({
         </Select>
       </div>
 
-      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "rgba(180,160,120,.35)" }}>
+      <div className="flex items-start justify-between gap-2 rounded-lg border p-2.5" style={{ borderColor: "rgba(148,163,184,.35)" }}>
         <div className="min-w-0">
           <Label htmlFor={`c-${seg.id}`} className="text-xs font-medium">
             Tarjeta grande en pantalla
@@ -3214,7 +3222,7 @@ function SegmentEditor({
             <Button
               size="sm"
               variant="ghost"
-              className="text-[#B0452F] hover:text-[#B0452F]"
+              className="text-[#EF4444] hover:text-[#EF4444]"
               onClick={() => setConfirmDelete(true)}
             >
               <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Eliminar
@@ -3291,7 +3299,7 @@ function HelpDialog() {
           </li>
           <li>
             · ¿Ajustaste un culto que ya guardaste? Con el culto cargado aparece el
-            botón dorado <b>Guardar en «…»</b>, a la derecha del título{" "}
+            botón celeste <b>Guardar en «…»</b>, a la derecha del título{" "}
             <b>Orden del culto</b> y también arriba del cuadro de <b>Programas</b>:
             un clic y el programa queda actualizado, sin volver a escribir el
             nombre. La versión que estaba guardada <b>queda como respaldo</b>{" "}
