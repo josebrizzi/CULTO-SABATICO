@@ -43,6 +43,42 @@ import {
 } from "@/lib/show";
 import { VERSION_APP } from "@/lib/version";
 
+/* ═════════════ Tema "Crema Elegante" de la pantalla (v0.9.2) ═════════════
+   La pantalla del culto usa el MISMO lenguaje visual que la consola del
+   panel: fondo crema, tarjetas blancas con borde dorado, títulos en
+   Playfair Display, cuerpo en Lato y números en Roboto Mono. Todo scoped
+   bajo .cns-proy para NO tocar el modo Biblia (réplica de proyeccion.html). */
+const ESTILO_PANTALLA = `
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600;700&family=Lato:wght@400;700;900&family=Roboto+Mono:wght@500;600;700&display=swap');
+.cns-proy{
+  --ink:#241E16; --ink-2:#4A3E30; --ink-mut:#8A7A64;
+  --marron:#6B4A2F; --oro:#B08D57; --oro-lt:#D9C493;
+  --ok:#4E7A52; --warn:#B98A2F; --danger:#B0452F; --line:#E4DCCB;
+}
+.cns-proy-bg{
+  background:
+    radial-gradient(1200px 520px at 85% -10%, rgba(176,141,87,.10), transparent 60%),
+    radial-gradient(900px 480px at -8% 110%, rgba(107,74,47,.07), transparent 55%),
+    linear-gradient(180deg,#F8F4EC 0%,#F3EEE1 100%);
+}
+.cns-proy-cuerpo{ font-family:'Lato','Segoe UI',system-ui,-apple-system,sans-serif; }
+.cns-proy-titulo{ font-family:'Playfair Display',Georgia,serif; }
+.cns-proy-num{ font-family:'Roboto Mono',ui-monospace,monospace; }
+.cns-proy-eyebrow{
+  display:flex;align-items:center;gap:10px;
+  font-family:'Lato',sans-serif;font-size:min(1.6vh,13px);font-weight:900;
+  letter-spacing:.30em;text-transform:uppercase;color:#A3823F;
+}
+.cns-proy-eyebrow::before{
+  content:"";width:8px;height:8px;flex:none;background:#B08D57;border-radius:2px;
+}
+@keyframes proy-pulse-gold{
+  0%,100%{ box-shadow:0 0 0 0 rgba(176,141,87,.45), 0 30px 80px rgba(60,45,25,.30); }
+  50%{ box-shadow:0 0 0 1.6vh rgba(176,141,87,0), 0 30px 80px rgba(60,45,25,.30); }
+}
+.animate-pulse-gold{ animation:proy-pulse-gold 1.5s ease-out infinite; }
+`;
+
 /* useLayoutEffect solo existe en el navegador; en el build estático se usa
    useEffect para que React no proteste al prerenderizar. */
 const useIsoLayoutEffect =
@@ -356,18 +392,18 @@ export default function PreacherView() {
 
   const counterColor =
     phase === "overtime"
-      ? "text-red-500"
+      ? "text-[#B0452F]"
       : phase === "warning"
-        ? "text-amber-300"
-        : "text-white";
+        ? "text-[#B98A2F]"
+        : "text-[#241E16]";
 
   const progressValue = totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0;
   const progressClass =
     phase === "overtime"
-      ? "[&>div]:bg-red-500"
+      ? "[&>div]:bg-[#B0452F]"
       : phase === "warning"
-        ? "[&>div]:bg-amber-400"
-        : "[&>div]:bg-white/80";
+        ? "[&>div]:bg-[#D9A441]"
+        : "[&>div]:bg-[#B08D57]";
 
   /* Mide y corta el versículo EXACTAMENTE igual que proyeccion.html: busca por
      búsqueda binaria el pedazo más grande que entra en 4 renglones, midiendo
@@ -655,26 +691,26 @@ export default function PreacherView() {
 
   const bloqueTiempoCompacto =
     active && seg ? (
-      <div className="shrink-0 px-[4vw] pb-[2vh]">
+      <div className="shrink-0 border-t border-[#E4DCCB] bg-[#FBF8F1] pb-[2vh] pl-[4vw] pr-[calc(4vw+240px)] pt-[1.6vh]">
         <div className="flex items-end justify-between gap-[2vw]">
           {/* Izquierda: el momento actual, en la misma línea que el contador */}
           <div className="flex min-w-0 items-center gap-[1.2vw] pb-[1.2vh]">
             <div
               key={seg.id}
               className={cn(
-                "animate-card-in min-w-0 max-w-[40vw] truncate rounded-full border-2 px-[2.6vw] py-[0.9vh] font-black uppercase leading-none tracking-wide",
-                COLORS[seg.color].chipDark,
+                "animate-card-in min-w-0 max-w-[40vw] truncate rounded-full border px-[2.6vw] py-[0.9vh] font-black uppercase leading-none tracking-wide",
+                COLORS[seg.color].chipLight,
               )}
               style={{ fontSize: "min(3.2vw, 4.6vh)" }}
             >
               {seg.title}
             </div>
             {state.status === "paused" ? (
-              <div className="shrink-0 rounded-full bg-amber-400 px-[2vw] py-[0.6vh] text-[2.2vh] font-bold uppercase tracking-widest text-amber-950">
+              <div className="shrink-0 rounded-full border border-[#D9C493] bg-[#F6EFDD] px-[2vw] py-[0.6vh] text-[2.2vh] font-bold uppercase tracking-widest text-[#7A5A28]">
                 En pausa
               </div>
             ) : phase === "overtime" ? (
-              <div className="shrink-0 rounded-full bg-red-600 px-[2vw] py-[0.6vh] text-[2.2vh] font-bold uppercase tracking-widest text-white">
+              <div className="shrink-0 rounded-full bg-[#B0452F] px-[2vw] py-[0.6vh] text-[2.2vh] font-bold uppercase tracking-widest text-white">
                 Tiempo cumplido
               </div>
             ) : null}
@@ -683,7 +719,7 @@ export default function PreacherView() {
           {/* Derecha: el tiempo grande */}
           <div
             className={cn(
-              "shrink-0 font-mono font-bold tabular-nums leading-none",
+              "cns-proy-num shrink-0 font-bold tabular-nums leading-none",
               counterColor,
               phase === "overtime" && state.settings.blink && "animate-blink-soft",
             )}
@@ -696,7 +732,7 @@ export default function PreacherView() {
         <div className="mt-[1.2vh] w-full">
           <Progress
             value={progressValue}
-            className={cn("h-[1.1vh] bg-white/10", progressClass)}
+            className={cn("h-[1.1vh] bg-[#EAE2CF]", progressClass)}
           />
         </div>
       </div>
@@ -713,7 +749,7 @@ export default function PreacherView() {
         title="Quitar el texto de esta pantalla"
         onClick={ocultar}
         className={cn(
-          "absolute right-[1.5vw] top-[6vh] z-30 grid h-10 w-10 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-opacity duration-300 hover:bg-[rgba(139,92,246,.30)]",
+          "absolute right-[1.5vw] top-[6vh] z-30 grid h-10 w-10 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-opacity duration-300 hover:bg-[#F6EFDD] hover:text-[#5C4327]",
           uiVisible ? "opacity-100" : "pointer-events-none opacity-0",
         )}
       >
@@ -726,12 +762,12 @@ export default function PreacherView() {
           <div className="flex shrink-0 items-end justify-between gap-3 pr-[calc(1.5vw+56px)]">
             <div
               key={`${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}`}
-              className="animate-card-in min-w-0 truncate font-bold uppercase tracking-[0.12em] text-amber-300"
+              className="animate-card-in min-w-0 truncate font-bold uppercase tracking-[0.12em] text-[#A3823F]"
               style={{ fontSize: "min(4.6vw, 6.2vh)" }}
             >
               {referenciaDelVerso(mensaje.verso)}
               {mensaje.verso.version ? (
-                <span className="ml-[1.2vw] font-semibold tracking-normal text-amber-200/70">
+                <span className="ml-[1.2vw] font-semibold tracking-normal text-[#B4A78E]">
                   · {abreviarVersion(mensaje.verso.version)}
                 </span>
               ) : null}
@@ -741,7 +777,7 @@ export default function PreacherView() {
                 type="button"
                 onClick={siguienteParte}
                 title="Siguiente parte (también con la tecla →)"
-                className="animate-card-in shrink-0 rounded-full border border-amber-300/40 bg-amber-300/10 px-[1.8vw] py-[0.6vh] font-bold uppercase tracking-widest text-amber-200"
+                className="animate-card-in shrink-0 rounded-full border border-[#D9C493] bg-[#F6EFDD] px-[1.8vw] py-[0.6vh] font-bold uppercase tracking-widest text-[#7A5A28]"
                 style={{ fontSize: "min(1.9vw, 2.6vh)" }}
               >
                 Parte {parte + 1} de {totalPartes} ▶
@@ -754,7 +790,7 @@ export default function PreacherView() {
             <div
               key={`t-${referenciaDelVerso(mensaje.verso)}-${abreviarVersion(mensaje.verso.version)}-${parte}`}
               onClick={siguienteParte}
-              className="animate-card-in absolute inset-0 cursor-pointer overflow-hidden font-semibold leading-[1.28] text-white"
+              className="animate-card-in absolute inset-0 cursor-pointer overflow-hidden font-semibold leading-[1.28] text-[#241E16]"
               style={{ fontSize: "min(6.2vw, 8.6vh)" }}
               dangerouslySetInnerHTML={{ __html: parteHtml }}
             />
@@ -764,7 +800,7 @@ export default function PreacherView() {
         <>
           <div className="flex shrink-0 items-end justify-between gap-3 pr-[calc(1.5vw+56px)]">
             <div
-              className="animate-card-in font-bold uppercase tracking-[0.12em] text-amber-300"
+              className="animate-card-in font-bold uppercase tracking-[0.12em] text-[#A3823F]"
               style={{ fontSize: "min(4.6vw, 6.2vh)" }}
             >
               Cita
@@ -772,7 +808,7 @@ export default function PreacherView() {
           </div>
           <div
             ref={textoCitaRef}
-            className="animate-card-in mt-[1.6vh] min-h-0 flex-1 overflow-y-auto font-semibold leading-[1.28] text-white [&_em]:text-amber-200 [&_strong]:text-amber-200"
+            className="animate-card-in mt-[1.6vh] min-h-0 flex-1 overflow-y-auto font-semibold leading-[1.28] text-[#241E16] [&_em]:text-[#7A5A28] [&_strong]:text-[#7A5A28]"
             style={{ fontSize: "min(6.2vw, 8.6vh)" }}
             dangerouslySetInnerHTML={{ __html: mensaje.html }}
           />
@@ -823,16 +859,18 @@ export default function PreacherView() {
         )}
       </main>
 
-      {/* ── Cuenta regresiva en el borde inferior (el único agregado) ── */}
+      {/* ── Cuenta regresiva en el borde inferior (el único agregado) ──
+          Con la marca crema: tira clara con línea dorada, legible sobre
+          cualquier fondo de proyección. */}
       {barraActiva && seg ? (
         <div
-          className="absolute inset-x-0 bottom-0 z-40 text-white"
+          className="absolute inset-x-0 bottom-0 z-40 text-[#241E16]"
           style={{
             height: "9vh",
             background:
-              "linear-gradient(90deg, rgba(5,6,18,.88), rgba(26,13,58,.88) 55%, rgba(5,6,18,.88))",
-            borderTop: "2px solid rgba(139,92,246,.55)",
-            boxShadow: "0 -10px 34px rgba(139,92,246,.28)",
+              "linear-gradient(90deg, rgba(252,250,244,.97), rgba(246,241,231,.97) 55%, rgba(252,250,244,.97))",
+            borderTop: "2px solid rgba(176,141,87,.55)",
+            boxShadow: "0 -10px 34px rgba(90,70,40,.18)",
           }}
         >
           <div className="flex h-full items-center justify-between gap-[2vw] px-[3vw] pb-[0.6vh]">
@@ -840,22 +878,22 @@ export default function PreacherView() {
               <div
                 key={seg.id}
                 className={cn(
-                  "animate-card-in min-w-0 max-w-[36vw] truncate rounded-full border-2 px-[2vw] py-[0.5vh] font-black uppercase leading-none tracking-wide",
-                  COLORS[seg.color].chipDark,
+                  "animate-card-in min-w-0 max-w-[36vw] truncate rounded-full border px-[2vw] py-[0.5vh] font-black uppercase leading-none tracking-wide",
+                  COLORS[seg.color].chipLight,
                 )}
                 style={{ fontSize: "min(2.2vw, 3vh)" }}
               >
                 {seg.title}
               </div>
               {state.status === "paused" ? (
-                <div className="shrink-0 rounded-full bg-amber-400 px-[1.4vw] py-[0.4vh] text-[1.8vh] font-bold uppercase tracking-widest text-amber-950">
+                <div className="shrink-0 rounded-full border border-[#D9C493] bg-[#F6EFDD] px-[1.4vw] py-[0.4vh] text-[1.8vh] font-bold uppercase tracking-widest text-[#7A5A28]">
                   En pausa
                 </div>
               ) : null}
             </div>
             <div
               className={cn(
-                "shrink-0 font-mono font-bold tabular-nums leading-none",
+                "cns-proy-num shrink-0 font-bold tabular-nums leading-none",
                 counterColor,
                 phase === "overtime" && state.settings.blink && "animate-blink-soft",
               )}
@@ -867,7 +905,7 @@ export default function PreacherView() {
           <Progress
             value={progressValue}
             className={cn(
-              "absolute inset-x-0 bottom-0 h-[3px] bg-white/15",
+              "absolute inset-x-0 bottom-0 h-[3px] bg-[#E0D5BE]",
               progressClass,
             )}
           />
@@ -915,7 +953,7 @@ export default function PreacherView() {
             aria-label="Cambiar a la pantalla de culto"
             title="Pantalla de culto: avisos, guion y mensajes (tecla B)"
             onClick={alternarModo}
-            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-colors hover:bg-[#F6EFDD] hover:text-[#5C4327]"
           >
             <Monitor className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -924,7 +962,7 @@ export default function PreacherView() {
             aria-label="Cambiar el fondo de la proyección"
             title={`Fondo: ${FONDO_NOMBRE[fondo]} (clic para cambiar)`}
             onClick={ciclarFondo}
-            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-colors hover:bg-[#F6EFDD] hover:text-[#5C4327]"
           >
             <Palette className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -936,8 +974,8 @@ export default function PreacherView() {
             className={cn(
               "grid h-11 w-11 place-items-center rounded-full border backdrop-blur transition-colors",
               confAbierta
-                ? "border-emerald-400/60 bg-emerald-600/30 text-emerald-200"
-                : "border-white/20 bg-black/60 text-white hover:bg-[rgba(139,92,246,.30)]",
+                ? "border-[#B08D57] bg-[#F6EFDD] text-[#7A5A28]"
+                : "border-[#E0D5BE] bg-white/90 text-[#4A3E30] hover:bg-[#F6EFDD] hover:text-[#5C4327]",
             )}
           >
             <Settings2 className="h-5 w-5" aria-hidden="true" />
@@ -947,7 +985,7 @@ export default function PreacherView() {
             aria-label="Volver al panel"
             title="Volver al panel"
             onClick={goPanel}
-            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-colors hover:bg-[#F6EFDD] hover:text-[#5C4327]"
           >
             <PanelLeft className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -956,7 +994,7 @@ export default function PreacherView() {
             aria-label="Pantalla completa"
             title="Pantalla completa"
             onClick={toggleFullscreen}
-            className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
+            className="grid h-11 w-11 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-colors hover:bg-[#F6EFDD] hover:text-[#5C4327]"
           >
             <Maximize className="h-5 w-5" aria-hidden="true" />
           </button>
@@ -976,8 +1014,8 @@ export default function PreacherView() {
       )}
       style={{ bottom: modo === "biblia" ? "17.5vh" : "13.5vh" }}
     >
-      <div className="w-[330px] max-w-[86vw] space-y-2 rounded-xl border border-white/15 bg-black/85 p-3.5 text-left backdrop-blur">
-        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-zinc-300">
+      <div className="w-[330px] max-w-[86vw] space-y-2 rounded-xl border border-[#E0D5BE] bg-white/95 p-3.5 text-left text-[#241E16] shadow-[0_18px_40px_rgba(60,45,25,.25)] backdrop-blur">
+        <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.2em] text-[#A3823F]">
           <BookOpen className="h-4 w-4" aria-hidden="true" /> Biblia Sincronizada
         </div>
         <input
@@ -988,14 +1026,14 @@ export default function PreacherView() {
             if (e.key === "Enter") aplicarUrl();
           }}
           placeholder="https://biblia-sincronizada.onrender.com"
-          className="h-9 w-full rounded-md border border-white/20 bg-white/10 px-2.5 text-sm text-white outline-none placeholder:text-zinc-500 focus:border-emerald-400/60"
+          className="h-9 w-full rounded-md border border-[#DCD2BE] bg-white px-2.5 text-sm text-[#241E16] outline-none placeholder:text-[#A89878] focus:border-[#C9B68C]"
           spellCheck={false}
         />
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"
             onClick={aplicarUrl}
-            className="rounded-md bg-emerald-600 px-3 py-1.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500"
+            className="rounded-md bg-[#6B4A2F] px-3 py-1.5 text-sm font-bold text-white transition-colors hover:bg-[#7A563A]"
           >
             Conectar
           </button>
@@ -1003,16 +1041,16 @@ export default function PreacherView() {
             className={cn(
               "text-xs",
               estado === "conectado"
-                ? "text-emerald-400"
+                ? "text-[#4E7A52]"
                 : estado === "conectando"
-                  ? "text-amber-400"
-                  : "text-zinc-400",
+                  ? "text-[#B98A2F]"
+                  : "text-[#8A7A64]",
             )}
           >
             {estadoBibliaLabel}
           </span>
         </div>
-        <p className="text-[11px] leading-snug text-zinc-500">
+        <p className="text-[11px] leading-snug text-[#8A7A64]">
           Los versículos que elijas en <b>admin.html</b> de Biblia Sincronizada
           aparecen acá en vivo, cortados en partes de 4 renglones igual que la
           proyección. El teléfono manda qué parte mostrar; con ← → o tocando el
@@ -1026,11 +1064,12 @@ export default function PreacherView() {
   return (
     <div
       className={cn(
-        "fixed inset-0 select-none overflow-hidden text-white",
-        modo === "culto" && "bg-black",
+        "cns-proy cns-proy-bg cns-proy-cuerpo fixed inset-0 select-none overflow-hidden text-[#241E16]",
         !uiVisible && "cursor-none",
       )}
     >
+      {/* Tema Crema Elegante de la pantalla (v0.9.2) */}
+      <style dangerouslySetInnerHTML={{ __html: ESTILO_PANTALLA }} />
       {/* Fuentes CMG Sans + estilos de la réplica de proyección */}
       <style dangerouslySetInnerHTML={{ __html: ESTILO_PROYECCION }} />
 
@@ -1038,47 +1077,50 @@ export default function PreacherView() {
         pantallaBiblia
       ) : (
         <>
-          {/* Barra superior discreta */}
-          <div className="pointer-events-none absolute inset-x-0 top-0 z-20 flex items-center justify-end px-[2.5vw] py-[1.6vh] text-[1.8vh] text-[#AEB8DD]/70">
-            <span className="flex items-center gap-3">
-              <span className="font-mono text-[#A78BFA]/80">{VERSION_APP}</span>
-              <span className="flex items-center gap-1.5" title={estadoBibliaLabel}>
-                <BookOpen
-                  className={cn(
-                    "h-[1.9vh] w-[1.9vh]",
-                    estado === "conectado"
-                      ? "text-emerald-400"
-                      : estado === "conectando"
-                        ? "text-amber-400"
-                        : "text-zinc-600",
-                  )}
-                  aria-hidden="true"
-                />
-                <span
-                  className={cn(
-                    "h-[1.2vh] w-[1.2vh] rounded-full",
-                    estado === "conectado"
-                      ? "animate-pulse bg-emerald-400"
-                      : estado === "conectando"
-                        ? "bg-amber-400"
-                        : "bg-zinc-600",
-                  )}
-                />
+          {/* Barra superior discreta, con la línea dorada de la marca */}
+          <div className="pointer-events-none absolute inset-x-0 top-0 z-20">
+            <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#B08D57]/70 to-transparent" />
+            <div className="flex items-center justify-end px-[2.5vw] py-[1.6vh] text-[1.8vh] text-[#8A7A64]">
+              <span className="flex items-center gap-3">
+                <span className="cns-proy-num text-[#A3823F]/90">{VERSION_APP}</span>
+                <span className="flex items-center gap-1.5" title={estadoBibliaLabel}>
+                  <BookOpen
+                    className={cn(
+                      "h-[1.9vh] w-[1.9vh]",
+                      estado === "conectado"
+                        ? "text-[#4E7A52]"
+                        : estado === "conectando"
+                          ? "text-[#B98A2F]"
+                          : "text-[#B4A78E]",
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span
+                    className={cn(
+                      "h-[1.2vh] w-[1.2vh] rounded-full",
+                      estado === "conectado"
+                        ? "animate-pulse bg-[#4E7A52]"
+                        : estado === "conectando"
+                          ? "bg-[#B98A2F]"
+                          : "bg-[#B4A78E]",
+                    )}
+                  />
+                </span>
+                <span className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      "h-[1.4vh] w-[1.4vh] rounded-full",
+                      state.status === "running"
+                        ? "animate-pulse bg-[#B0452F]"
+                        : state.status === "paused"
+                          ? "bg-[#B98A2F]"
+                          : "bg-[#B4A78E]",
+                    )}
+                  />
+                  {statusLabel}
+                </span>
               </span>
-              <span className="flex items-center gap-2">
-                <span
-                  className={cn(
-                    "h-[1.4vh] w-[1.4vh] rounded-full",
-                    state.status === "running"
-                      ? "animate-pulse bg-red-500"
-                      : state.status === "paused"
-                        ? "bg-amber-400"
-                        : "bg-zinc-600",
-                  )}
-                />
-                {statusLabel}
-              </span>
-            </span>
+            </div>
           </div>
 
           {/* ═══ Con letra bíblica: texto arriba + tiempo abajo ═══ */}
@@ -1091,7 +1133,7 @@ export default function PreacherView() {
             <>
               {/* Pista: el panel no está abierto (solo donde no estorba) */}
               {!peerOnline && (!active || mode === "timer") ? (
-                <div className="absolute bottom-[2.5vh] left-[2vw] z-30 max-w-[30vw] text-[1.6vh] leading-snug text-zinc-600">
+                <div className="absolute bottom-[2.5vh] left-[2vw] z-30 max-w-[30vw] text-[1.6vh] leading-snug text-[#8A7A64]">
                   Abrí el Panel de control en otra ventana de este navegador para
                   manejar el cronómetro.
                 </div>
@@ -1100,13 +1142,24 @@ export default function PreacherView() {
               {/* ── Culto sin iniciar ── */}
               {!active && state.status !== "finished" ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center px-[6vw] text-center">
-                  <div className="text-[6.5vh] font-bold leading-tight">
+                  <div className="cns-proy-eyebrow">
+                    Iglesia Adventista del Séptimo Día · José C. Paz Centro
+                  </div>
+                  <div className="cns-proy-titulo mt-[3vh] text-[7.5vh] font-bold leading-tight text-[#241E16]">
                     El culto comienza pronto
                   </div>
+                  <div className="mt-[2vh] h-[3px] w-[80px] rounded-full bg-[#B08D57]" />
                   {first ? (
-                    <div className="mt-[4vh] text-[2.6vh] text-zinc-400">
-                      Primer momento: <b>{first.title}</b> · {first.minutes} min · total{" "}
-                      {fmtMin(totalMin)}
+                    <div className="mt-[5vh] rounded-2xl border border-[#E4DCCB] bg-white/90 px-[3vw] py-[2.4vh] shadow-[0_10px_30px_rgba(90,70,40,.10)]">
+                      <div className="text-[1.8vh] font-black uppercase tracking-[0.25em] text-[#A3823F]">
+                        Primer momento
+                      </div>
+                      <div className="cns-proy-titulo mt-[1vh] text-[3.6vh] font-bold text-[#241E16]">
+                        {first.title}
+                      </div>
+                      <div className="mt-[1vh] text-[2.2vh] text-[#8A7A64]">
+                        {first.minutes} min · total del culto {fmtMin(totalMin)}
+                      </div>
                     </div>
                   ) : null}
                 </div>
@@ -1115,8 +1168,11 @@ export default function PreacherView() {
               {/* ── Culto finalizado ── */}
               {state.status === "finished" ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-                  <div className="text-[7vh] font-bold">Culto finalizado</div>
-                  <div className="mt-[2vh] text-[2.5vh] text-zinc-500">
+                  <div className="cns-proy-titulo text-[8vh] font-bold text-[#241E16]">
+                    Culto finalizado
+                  </div>
+                  <div className="mt-[2vh] h-[3px] w-[80px] rounded-full bg-[#B08D57]" />
+                  <div className="mt-[3vh] text-[2.6vh] text-[#8A7A64]">
                     Reiniciá desde el panel de control para un nuevo culto.
                   </div>
                 </div>
@@ -1134,14 +1190,16 @@ export default function PreacherView() {
                           COLORS[seg.color].dot,
                         )}
                       />
-                      <div className="truncate text-[3vh] font-bold">{seg.title}</div>
+                      <div className="cns-proy-titulo truncate text-[3.4vh] font-bold text-[#241E16]">
+                        {seg.title}
+                      </div>
                       {state.status === "paused" ? (
-                        <span className="shrink-0 rounded-full bg-amber-400 px-[1.4vw] py-[0.5vh] text-[1.8vh] font-bold uppercase tracking-widest text-amber-950">
+                        <span className="shrink-0 rounded-full border border-[#D9C493] bg-[#F6EFDD] px-[1.4vw] py-[0.5vh] text-[1.8vh] font-bold uppercase tracking-widest text-[#7A5A28]">
                           En pausa
                         </span>
                       ) : null}
                     </div>
-                    <div className="shrink-0 text-[2.2vh] font-bold tabular-nums text-zinc-400">
+                    <div className="shrink-0 text-[2.2vh] font-bold tabular-nums text-[#8A7A64]">
                       {seg.bullets.length} {seg.bullets.length === 1 ? "punto" : "puntos"}
                     </div>
                   </div>
@@ -1150,7 +1208,7 @@ export default function PreacherView() {
                   <div className="flex min-h-0 flex-1 items-center justify-center px-[5vw]">
                     <div
                       key={seg.id}
-                      className="animate-card-in max-w-[90vw] text-center font-bold leading-[1.3] text-balance text-white"
+                      className="animate-card-in max-w-[90vw] text-center font-bold leading-[1.3] text-balance text-[#241E16]"
                       style={{ fontSize: cardFontSize(seg.bullets.join(" "), seg.bullets.length) }}
                     >
                       {seg.bullets.map((b, i) => (
@@ -1162,15 +1220,15 @@ export default function PreacherView() {
                   </div>
 
                   {/* Contador abajo */}
-                  <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-[4vw] py-[1.8vh]">
+                  <div className="shrink-0 border-t border-[#E4DCCB] bg-[#FBF8F1] py-[1.8vh] pl-[4vw] pr-[calc(4vw+240px)]">
                     <div className="flex items-end justify-between gap-4">
                       <div className="min-w-0">
-                        <div className="text-[1.7vh] uppercase tracking-[0.25em] text-zinc-500">
+                        <div className="text-[1.7vh] font-black uppercase tracking-[0.25em] text-[#A3823F]">
                           Tiempo del momento
                         </div>
                         <div
                           className={cn(
-                            "font-mono font-bold tabular-nums leading-none",
+                            "cns-proy-num mt-[0.5vh] font-bold tabular-nums leading-none",
                             counterColor,
                             phase === "overtime" && state.settings.blink && "animate-blink-soft",
                           )}
@@ -1179,12 +1237,12 @@ export default function PreacherView() {
                           {counterText}
                         </div>
                       </div>
-                      <div className="shrink-0 text-right text-[2vh] leading-relaxed text-zinc-500">
+                      <div className="shrink-0 text-right text-[2vh] leading-relaxed text-[#8A7A64]">
                         <div>{seg.minutes} min planificados</div>
                         <div>
                           {next ? (
                             <>
-                              Siguiente: <b className="text-zinc-300">{next.title}</b> ·{" "}
+                              Siguiente: <b className="text-[#4A3E30]">{next.title}</b> ·{" "}
                               {next.minutes} min
                             </>
                           ) : (
@@ -1195,7 +1253,7 @@ export default function PreacherView() {
                     </div>
                     <Progress
                       value={progressValue}
-                      className={cn("mt-[1.2vh] h-[0.8vh] bg-white/10", progressClass)}
+                      className={cn("mt-[1.2vh] h-[0.8vh] bg-[#EAE2CF]", progressClass)}
                     />
                   </div>
                 </div>
@@ -1204,26 +1262,26 @@ export default function PreacherView() {
               {/* ── Momento en modo contador grande ── */}
               {active && !cardsOn && mode === "timer" && seg ? (
                 <div className="absolute inset-0 flex flex-col items-center justify-center px-[4vw] pb-[6vh] text-center">
-                  <div className="text-[3.4vh] font-bold tracking-wide text-zinc-200">
+                  <div className="cns-proy-titulo text-[3.8vh] font-bold tracking-wide text-[#241E16]">
                     {seg.title}
                   </div>
                   {seg.speaker ? (
-                    <div className="mt-[0.8vh] text-[2.2vh] text-zinc-500">{seg.speaker}</div>
+                    <div className="mt-[0.8vh] text-[2.2vh] text-[#8A7A64]">{seg.speaker}</div>
                   ) : null}
 
                   {state.status === "paused" ? (
-                    <div className="mt-[3vh] rounded-full bg-amber-400 px-[3vw] py-[1vh] text-[2.4vh] font-bold uppercase tracking-widest text-amber-950">
+                    <div className="mt-[3vh] rounded-full border border-[#D9C493] bg-[#F6EFDD] px-[3vw] py-[1vh] text-[2.4vh] font-bold uppercase tracking-widest text-[#7A5A28]">
                       En pausa
                     </div>
                   ) : phase === "overtime" ? (
-                    <div className="mt-[3vh] rounded-full bg-red-600 px-[3vw] py-[1vh] text-[2.4vh] font-bold uppercase tracking-widest text-white">
+                    <div className="mt-[3vh] rounded-full bg-[#B0452F] px-[3vw] py-[1vh] text-[2.4vh] font-bold uppercase tracking-widest text-white">
                       Tiempo cumplido
                     </div>
                   ) : null}
 
                   <div
                     className={cn(
-                      "mt-[1.5vh] font-mono font-bold tabular-nums leading-none",
+                      "cns-proy-num mt-[1.5vh] font-bold tabular-nums leading-none",
                       counterColor,
                       phase === "overtime" && state.settings.blink && "animate-blink-soft",
                     )}
@@ -1232,7 +1290,7 @@ export default function PreacherView() {
                     {counterText}
                   </div>
 
-                  <div className="mt-[2vh] text-[2.4vh] text-zinc-500">
+                  <div className="mt-[2vh] text-[2.4vh] text-[#8A7A64]">
                     {phase === "overtime"
                       ? `Excedente · planificado ${seg.minutes} min`
                       : phase === "warning"
@@ -1241,7 +1299,7 @@ export default function PreacherView() {
                   </div>
 
                   <div className="mt-[4vh] w-[64vw] max-w-[1100px]">
-                    <Progress value={progressValue} className={cn("h-[1.2vh] bg-white/10", progressClass)} />
+                    <Progress value={progressValue} className={cn("h-[1.2vh] bg-[#EAE2CF]", progressClass)} />
                   </div>
 
                   {state.settings.showBulletsOnTimer && seg.bullets.length > 0 ? (
@@ -1251,7 +1309,7 @@ export default function PreacherView() {
                           key={i}
                           className={cn(
                             "max-w-[46vw] truncate rounded-full border px-[1.6vw] py-[0.8vh] text-[2.1vh]",
-                            COLORS[seg.color].chipDark,
+                            COLORS[seg.color].chipLight,
                           )}
                           title={b}
                         >
@@ -1274,9 +1332,11 @@ export default function PreacherView() {
                           COLORS[seg.color].dot,
                         )}
                       />
-                      <div className="text-[3vh] font-bold">{seg.title}</div>
+                      <div className="cns-proy-titulo text-[3.4vh] font-bold text-[#241E16]">
+                        {seg.title}
+                      </div>
                       {state.status === "paused" ? (
-                        <span className="rounded-full bg-amber-400 px-[1.4vw] py-[0.5vh] text-[1.8vh] font-bold uppercase tracking-widest text-amber-950">
+                        <span className="rounded-full border border-[#D9C493] bg-[#F6EFDD] px-[1.4vw] py-[0.5vh] text-[1.8vh] font-bold uppercase tracking-widest text-[#7A5A28]">
                           En pausa
                         </span>
                       ) : null}
@@ -1288,7 +1348,7 @@ export default function PreacherView() {
                             key={i}
                             className={cn(
                               "rounded-full border px-[1.4vw] py-[0.7vh] text-[2.1vh] font-medium",
-                              COLORS[seg.color].chipDark,
+                              COLORS[seg.color].chipLight,
                             )}
                           >
                             {b}
@@ -1304,7 +1364,7 @@ export default function PreacherView() {
                         line.trim() ? (
                           <p
                             key={i}
-                            className="mb-[3.2vh] font-medium text-zinc-100"
+                            className="mb-[3.2vh] font-medium text-[#241E16]"
                             style={{ fontSize: fuenteGuion, lineHeight: 1.35 }}
                           >
                             {line}
@@ -1318,7 +1378,7 @@ export default function PreacherView() {
                         {seg.bullets.map((b, i) => (
                           <p
                             key={i}
-                            className="mb-[4vh] font-bold text-zinc-100"
+                            className="mb-[4vh] font-bold text-[#241E16]"
                             style={{ fontSize: fuentePuntos, lineHeight: 1.3 }}
                           >
                             {i + 1}. {b}
@@ -1326,21 +1386,21 @@ export default function PreacherView() {
                         ))}
                       </div>
                     ) : (
-                      <p className="py-[8vh] text-center text-[2.4vh] text-zinc-600">
+                      <p className="py-[8vh] text-center text-[2.4vh] text-[#8A7A64]">
                         El guion de este momento está vacío. Escribilo desde el panel de control.
                       </p>
                     )}
                   </div>
 
-                  <div className="shrink-0 border-t border-white/10 bg-zinc-950 px-[4vw] py-[1.8vh]">
+                  <div className="shrink-0 border-t border-[#E4DCCB] bg-[#FBF8F1] py-[1.8vh] pl-[4vw] pr-[calc(4vw+240px)]">
                     <div className="flex items-end justify-between gap-4">
                       <div className="min-w-0">
-                        <div className="text-[1.7vh] uppercase tracking-[0.25em] text-zinc-500">
+                        <div className="text-[1.7vh] font-black uppercase tracking-[0.25em] text-[#A3823F]">
                           Tiempo del momento
                         </div>
                         <div
                           className={cn(
-                            "font-mono font-bold tabular-nums leading-none",
+                            "cns-proy-num mt-[0.5vh] font-bold tabular-nums leading-none",
                             counterColor,
                             phase === "overtime" && state.settings.blink && "animate-blink-soft",
                           )}
@@ -1349,12 +1409,12 @@ export default function PreacherView() {
                           {counterText}
                         </div>
                       </div>
-                      <div className="shrink-0 text-right text-[2vh] leading-relaxed text-zinc-500">
+                      <div className="shrink-0 text-right text-[2vh] leading-relaxed text-[#8A7A64]">
                         <div>{seg.minutes} min planificados</div>
                         <div>
                           {next ? (
                             <>
-                              Siguiente: <b className="text-zinc-300">{next.title}</b> ·{" "}
+                              Siguiente: <b className="text-[#4A3E30]">{next.title}</b> ·{" "}
                               {next.minutes} min
                             </>
                           ) : (
@@ -1365,7 +1425,7 @@ export default function PreacherView() {
                     </div>
                     <Progress
                       value={progressValue}
-                      className={cn("mt-[1.2vh] h-[0.8vh] bg-white/10", progressClass)}
+                      className={cn("mt-[1.2vh] h-[0.8vh] bg-[#EAE2CF]", progressClass)}
                     />
                   </div>
                 </div>
@@ -1373,13 +1433,17 @@ export default function PreacherView() {
             </>
           )}
 
-          {/* ── Mensaje del operador: SOLO el texto, con letra gigante ── */}
+          {/* ── Mensaje del operador: SOLO el texto, con letra gigante ──
+              Normal: tarjeta blanca elegante con borde dorado y pulsuación
+              suave. Urgente: rojo fuerte, como en la consola. */}
           {state.message ? (
             <div className="fixed inset-0 z-50 flex items-center justify-center p-[4vw]">
               <div
                 className={cn(
-                  "animate-pulse-border flex w-full items-center justify-center rounded-[3rem] px-[4vw] py-[8vh] text-center shadow-2xl",
-                  state.message.urgent ? "bg-red-600 text-white" : "bg-amber-400 text-zinc-950",
+                  "flex w-full items-center justify-center rounded-[3rem] border-2 px-[4vw] py-[8vh] text-center shadow-[0_30px_80px_rgba(60,45,25,.35)]",
+                  state.message.urgent
+                    ? "animate-pulse-border border-[#8A3A26] bg-[#B0452F] text-white"
+                    : "animate-pulse-gold border-[#D9C493] bg-white text-[#241E16]",
                 )}
               >
                 <div
@@ -1406,7 +1470,7 @@ export default function PreacherView() {
                 aria-label="Cambiar a la pantalla Biblia"
                 title="Pantalla Biblia: proyección con cuenta regresiva (tecla B)"
                 onClick={alternarModo}
-                className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-colors hover:bg-[#F6EFDD] hover:text-[#5C4327]"
               >
                 <BookOpen className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -1418,8 +1482,8 @@ export default function PreacherView() {
                 className={cn(
                   "grid h-11 w-11 place-items-center rounded-full border backdrop-blur transition-colors",
                   confAbierta
-                    ? "border-emerald-400/60 bg-emerald-600/30 text-emerald-200"
-                    : "border-white/20 bg-black/60 text-white hover:bg-[rgba(139,92,246,.30)]",
+                    ? "border-[#B08D57] bg-[#F6EFDD] text-[#7A5A28]"
+                    : "border-[#E0D5BE] bg-white/90 text-[#4A3E30] hover:bg-[#F6EFDD] hover:text-[#5C4327]",
                 )}
               >
                 <Settings2 className="h-5 w-5" aria-hidden="true" />
@@ -1429,7 +1493,7 @@ export default function PreacherView() {
                 aria-label="Volver al panel"
                 title="Volver al panel"
                 onClick={goPanel}
-                className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-colors hover:bg-[#F6EFDD] hover:text-[#5C4327]"
               >
                 <PanelLeft className="h-5 w-5" aria-hidden="true" />
               </button>
@@ -1438,7 +1502,7 @@ export default function PreacherView() {
                 aria-label="Pantalla completa"
                 title="Pantalla completa"
                 onClick={toggleFullscreen}
-                className="grid h-11 w-11 place-items-center rounded-full border border-[rgba(167,139,250,.40)] bg-[rgba(8,10,28,.72)] shadow-[0_0_16px_rgba(139,92,246,.30)] text-white backdrop-blur transition-colors hover:bg-[rgba(139,92,246,.30)]"
+                className="grid h-11 w-11 place-items-center rounded-full border border-[#E0D5BE] bg-white/90 text-[#4A3E30] shadow-[0_8px_22px_rgba(60,45,25,.22)] backdrop-blur transition-colors hover:bg-[#F6EFDD] hover:text-[#5C4327]"
               >
                 <Maximize className="h-5 w-5" aria-hidden="true" />
               </button>
