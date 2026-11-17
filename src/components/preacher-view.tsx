@@ -45,13 +45,14 @@ import {
    la versión cada 200 ms junto con el cronómetro y se sentía como titilante).
    Si lo necesitás de vuelta para debug, volvé a importarlo de @/lib/version. */
 
-/* ═════════════ Tema "Neón Gamer" de la pantalla (v0.9.3) ═════════════
+/* ═════════════ Tema "Neón Gamer" de la pantalla (v0.9.5) ═════════════
    Estilo juvenil/gamer: fondo oscuro con resplandores azules y violetas,
-   dígitos en Orbitron (marcador arcade), títulos en Space Grotesk y acentos
-   vibrantes (cian, azul, violeta, verde, naranja, amarillo). Sin marrón.
+   dígitos en JetBrains Mono (MONOESPACIADA: cada dígito ocupa el mismo
+   ancho, así el cronómetro NO "salta" cuando un número cambia), títulos
+   en Space Grotesk y acentos vibrantes. Sin marrón.
    Todo scoped bajo .gproy para NO tocar el modo Biblia (réplica). */
 const ESTILO_PANTALLA = `
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700;800&family=Orbitron:wght@500;700;900&family=Space+Grotesk:wght@400;500;700&display=swap');
 .gproy{
   --cian:#22D3EE; --azul:#3B82F6; --violeta:#8B5CF6;
   --verde:#34D399; --naranja:#FB923C; --amarillo:#FACC15; --rojo:#EF4444;
@@ -64,7 +65,19 @@ const ESTILO_PANTALLA = `
 }
 .gproy-cuerpo{ font-family:'Space Grotesk','Segoe UI',system-ui,sans-serif; }
 .gproy-titulo{ font-family:'Space Grotesk','Segoe UI',sans-serif; letter-spacing:-0.01em; }
-.gproy-num{ font-family:'Orbitron','Space Grotesk',monospace; letter-spacing:.04em; }
+/* v0.9.5: cronómetro en JetBrains Mono (monoespaciada). Antes era Orbitron,
+   que NO es monoespaciada: el "1" era más angosto que el "8", así que cada
+   vez que un dígito cambiaba (cada 200 ms), el ancho del número cambiaba y
+   el cronómetro "saltaba" hacia los costados. Eso era el parpadeo.
+   JetBrains Mono es monoespaciada con tabular nums nativos: el ancho del
+   número se mantiene estable mientras los dígitos cambian. */
+.gproy-num{
+  font-family:'JetBrains Mono','Orbitron','Space Grotesk',monospace;
+  letter-spacing:.04em;
+  font-variant-numeric:tabular-nums;
+  font-feature-settings:"tnum" 1;
+  font-variant-ligatures:none;
+}
 .gproy-grad{
   background:linear-gradient(92deg,#22D3EE 0%,#3B82F6 48%,#8B5CF6 100%);
   -webkit-background-clip:text; background-clip:text; color:transparent;
@@ -224,9 +237,13 @@ export default function PreacherView() {
   const { state, peerOnline, sendAction } = useShowChannel("stage");
 
   const [now, setNow] = useState(0);
+  /* v0.9.5: ahora se actualiza cada 500 ms (antes cada 200 ms). El cronómetro
+     muestra segundos: con 500 ms alcanza para ver cada cambio de segundo sin
+     que el re-render sea 5 veces por segundo. Menos re-renders = menos
+     parpadeo en la fuente, aunque la fuente ya sea monoespaciada. */
   useEffect(() => {
     const first = window.setTimeout(() => setNow(Date.now()), 0);
-    const id = window.setInterval(() => setNow(Date.now()), 200);
+    const id = window.setInterval(() => setNow(Date.now()), 500);
     return () => {
       window.clearTimeout(first);
       window.clearInterval(id);
@@ -399,8 +416,15 @@ export default function PreacherView() {
   const cardsOn = active && cardsActive(seg);
   const live = now > 0 && active;
 
+  /* v0.9.5: cronómetro SIEMPRE con el MISMO formato cuando está en overtime,
+     sin depender del `phase` (que oscila entre "overtime" y "running" cada
+     500 ms cuando el tiempo está justo en el límite). Antes el `counterText`
+     alternaba entre "+00:00" (con signo +) y "00:00" (sin signo), y ese
+     cambio de ancho era el parpadeo visible. Ahora: si hay overtime, SIEMPRE
+     muestra con el "+", sin importar el phase. */
+  const enOvertime = active && overtimeMs > 0;
   const counterText = live
-    ? phase === "overtime"
+    ? enOvertime
       ? `+${fmtHMS(Math.floor(overtimeMs / 1000))}`
       : fmtHMS(Math.ceil(remaining / 1000))
     : "--:--";
