@@ -749,8 +749,12 @@ export default function PreacherView() {
           <div
             className={cn(
               "gproy-num shrink-0 font-bold tabular-nums leading-none",
+              /* v0.9.5: sin animate-blink-soft. Antes, cuando llegabas a
+                 overtime (cronómetro en +), esta animación hacía titilar
+                 el número entre visible e invisible cada 200-300 ms. Era
+                 la causa real del "titilado" que distraía a la gente. El
+                 cronómetro ahora es siempre rojo con glow, sin parpadeo. */
               counterColor,
-              phase === "overtime" && state.settings.blink && "animate-blink-soft",
             )}
             style={{ fontSize: "min(14vw, 19vh)" }}
           >
@@ -924,7 +928,6 @@ export default function PreacherView() {
               className={cn(
                 "gproy-num shrink-0 font-bold tabular-nums leading-none",
                 counterColor,
-                phase === "overtime" && state.settings.blink && "animate-blink-soft",
               )}
               style={{ fontSize: "min(4.4vw, 6vh)" }}
             >
@@ -1261,7 +1264,6 @@ export default function PreacherView() {
                           className={cn(
                             "gproy-num mt-[0.5vh] font-bold tabular-nums leading-none",
                             counterColor,
-                            phase === "overtime" && state.settings.blink && "animate-blink-soft",
                           )}
                           style={{ fontSize: "min(8vw, 11vh)" }}
                         >
@@ -1314,7 +1316,6 @@ export default function PreacherView() {
                     className={cn(
                       "gproy-num mt-[1.5vh] font-bold tabular-nums leading-none",
                       counterColor,
-                      phase === "overtime" && state.settings.blink && "animate-blink-soft",
                     )}
                     style={{ fontSize: "min(23vw, 30vh)" }}
                   >
@@ -1433,7 +1434,6 @@ export default function PreacherView() {
                           className={cn(
                             "gproy-num mt-[0.5vh] font-bold tabular-nums leading-none",
                             counterColor,
-                            phase === "overtime" && state.settings.blink && "animate-blink-soft",
                           )}
                           style={{ fontSize: "min(8vw, 11vh)" }}
                         >
