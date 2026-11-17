@@ -41,7 +41,9 @@ import {
   phaseOf,
   useShowChannel,
 } from "@/lib/show";
-import { VERSION_APP } from "@/lib/version";
+/* v0.9.5: VERSION_APP ya no se muestra en la pantalla del predicador (sacaba
+   la versión cada 200 ms junto con el cronómetro y se sentía como titilante).
+   Si lo necesitás de vuelta para debug, volvé a importarlo de @/lib/version. */
 
 /* ═════════════ Tema "Neón Gamer" de la pantalla (v0.9.3) ═════════════
    Estilo juvenil/gamer: fondo oscuro con resplandores azules y violetas,
@@ -339,9 +341,14 @@ export default function PreacherView() {
         ? "Biblia: conectando…"
         : "Biblia: sin conexión";
 
+  /* v0.9.5: sacar la versión de la píldora de conexión. Antes decía
+     "Conectado · v0.9.4": como `now` se actualiza cada 200 ms y todo el
+     componente se re-renderiza, esa cadena se redibujaba junto con el
+     cronómetro y se sentía como titilante. Ahora la píldora es solo
+     "Conectado" / "Conectando…" / "Sin conexión", sin versión. */
   const estadoCorto =
     estado === "conectado"
-      ? `Conectado · ${VERSION_APP}`
+      ? "Conectado"
       : estado === "conectando"
         ? "Conectando…"
         : "Sin conexión";
@@ -398,12 +405,18 @@ export default function PreacherView() {
       : fmtHMS(Math.ceil(remaining / 1000))
     : "--:--";
 
+  /* v0.9.5: cronómetro SIEMPRE rojo. Antes cambiaba de cian (normal) →
+     amarillo (aviso) → rojo (cumplido), y como `now` se actualiza cada
+     200 ms y `phase` oscila entre overtime y running por el redondeo de
+     los milisegundos, el color titilaba entre tres tonos y distraía a la
+     gente. Ahora es siempre rojo con glow rojo: el parpadeo del blink
+     (si está activado) queda más suave y no cambia de tono. */
   const counterColor =
     phase === "overtime"
       ? "text-[#F87171] gproy-glow-rojo"
       : phase === "warning"
-        ? "text-[#FACC15] gproy-glow-amar"
-        : "text-white gproy-glow-cian";
+        ? "text-[#F87171] gproy-glow-rojo"
+        : "text-[#F87171] gproy-glow-rojo";
 
   const progressValue = totalMs > 0 ? Math.min(100, (elapsed / totalMs) * 100) : 0;
   const progressClass =
@@ -643,15 +656,19 @@ export default function PreacherView() {
   const first = state.segments[0];
   const totalMin = state.segments.reduce((a, x) => a + x.minutes, 0);
 
+  /* v0.9.5: statusLabel simplificado. Antes alternaba entre "En vivo" y
+     "Tiempo cumplido" según `phase`, que oscila cada 200 ms cuando el
+     cronómetro está cerca del límite (por el redondeo de milisegundos).
+     Eso hacía que la palabra titilara entre las dos en la barra superior.
+     Ahora: si está corriendo, siempre "En vivo"; el cambio de color del
+     cronómetro (siempre rojo) ya hace el aviso visual. */
   const statusLabel =
     state.status === "finished"
       ? "Finalizado"
       : !active
         ? "En espera"
         : state.status === "running"
-          ? phase === "overtime"
-            ? "Tiempo cumplido"
-            : "En vivo"
+          ? "En vivo"
           : "En pausa";
 
   /* Tarjeta grande: el tamaño de letra se adapta al largo del texto y a la
@@ -718,9 +735,13 @@ export default function PreacherView() {
                 En pausa
               </div>
             ) : phase === "overtime" ? (
-              <div className="shrink-0 rounded-full bg-red-600 px-[2vw] py-[0.6vh] text-[2.2vh] font-bold uppercase tracking-widest text-white">
-                Tiempo cumplido
-              </div>
+              /* v0.9.5: el cartel "Tiempo cumplido" se sacó. Aparecía y
+                 desaparecía cuando phase oscilaba entre overtime y running
+                 (cada 200 ms por el redondeo de ms), y eso producía el
+                 titilamiento. Ahora el cronómetro siempre es rojo y el
+                 signo "+" ya indica que estás en overtime: no hace falta
+                 otro aviso que distraiga. */
+              null
             ) : null}
           </div>
 
@@ -1090,7 +1111,9 @@ export default function PreacherView() {
             <div className="absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-transparent via-[#3B82F6]/70 to-transparent" />
             <div className="flex items-center justify-end px-[2.5vw] py-[1.6vh] text-[1.8vh] text-slate-400">
               <span className="flex items-center gap-3">
-                <span className="gproy-num text-[#67E8F9]/90">{VERSION_APP}</span>
+                {/* v0.9.5: la versión se sacó de la barra superior para que
+                    no distraiga a la gente (además re-renderizaba cada 200 ms
+                    junto con el cronómetro). */}
                 <span className="flex items-center gap-1.5" title={estadoBibliaLabel}>
                   <BookOpen
                     className={cn(
@@ -1282,9 +1305,9 @@ export default function PreacherView() {
                       En pausa
                     </div>
                   ) : phase === "overtime" ? (
-                    <div className="mt-[3vh] rounded-full bg-red-600 px-[3vw] py-[1vh] text-[2.4vh] font-bold uppercase tracking-widest text-white">
-                      Tiempo cumplido
-                    </div>
+                    /* v0.9.5: ídem, el cartel grande "Tiempo cumplido"
+                       se sacó para evitar el titilamiento cada 200 ms. */
+                    null
                   ) : null}
 
                   <div
